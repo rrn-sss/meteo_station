@@ -1,0 +1,70 @@
+# Prerequisites (зависимости, генерируемые make и т.д.)
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# Build directories (часто используются в C++ проектах)
+build/
+Debug/
+Release/
+x64/
+x86/
+bin/
+obj/
+out/
+.pio/
+
+# Visual Studio / Visual Studio Code
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.vscode/
+.ipch/
+*.sdf
+*.opensdf
+*.cache
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+
+# Другие IDE (CLion, Qt и т.д.)
+.idea/
+*.iml
+
+# Временные файлы редакторов
+*~
+*.swp
+*.tmp
