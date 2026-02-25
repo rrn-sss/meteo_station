@@ -1,0 +1,12 @@
+{
+    "mqtt_server": "tag78.ru",
+    "mqtt_port": "1883",
+    "mqtt_user": "tag78",
+    "mqtt_pass": "zalp2678",
+    "mqtt_prefix": "meteo_station",
+    "bot_token": "XXXXXXXXXX:YYYYYYYYYYYYYYYYYYYYY",
+    "bot_chat_id": "-ZZZZZZZZZZZZZ",
+    "latitude": "47.2024",
+    "longitude": "38.9037",
+    "gmt_offset_sec": "10800"
+}

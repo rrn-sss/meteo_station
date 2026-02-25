@@ -1,0 +1,11 @@
+BasedOnStyle: LLVM
+BreakBeforeBraces: Allman  # ������ ��� ������ ������ �� ��������� ������
+IndentWidth: 2             # ������ � 2 �������
+UseTab: Never              # ������������ �������, � �� ����
+TabWidth: 2                # ������ ���� (�� ������ ������)
+ColumnLimit: 0             # ��� ����������� ����� ������ (��� ������� ���)
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+# Основное — отключить "умное" исправление escape-последовательностей
+ExperimentalAutoDetectBinPacking: false

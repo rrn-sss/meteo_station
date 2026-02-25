@@ -1,0 +1,8 @@
+# Custom partition table for meteo_station project
+# Assumptions: 4MB flash, LittleFS size 1MB (as set in platformio.ini)
+# Layout: nvs, otadata, app, littlefs
+# Name,   Type, SubType, Offset,  Size, Flags
+nvs,data,nvs,0x9000,0x5000,
+otadata,data,ota,0xE000,0x2000,
+app0,app,ota_0,0x10000,0x2C0000,
+spiffs,data,spiffs,0x2D0000,0x100000,
