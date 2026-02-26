@@ -949,56 +949,37 @@ bool MeteoWidgets::draw_battery_level_widget(uint8_t level)
 
 bool MeteoWidgets::draw_update_processing_widget()
 {
-  // Make the widget occupy the whole screen and center the message
-  const uint16_t w = SCREEN_WIDTH;
-  const uint16_t h = 80;
+  // Fill entire screen with background color first
+  tft.fillScreen(WIDGET_BG_COLOR);
 
-  lgfx::LGFX_Sprite widget_bg(&tft);
-  lgfx::LGFX_Sprite txt_sprite(&tft);
-
-  if (!widget_bg.createSprite(w, h))
-  {
-    ESP_LOGE("WIDGET", "createSprite for update-processing bg failed!");
-    return false;
-  }
-  // Fill full-screen background with widget background color
-  widget_bg.fillSprite(WIDGET_BG_COLOR);
-
-  // Draw a rounded red framed rectangle inset from screen edges (draw twice for thicker border)
+  // Draw a rounded red framed rectangle centered on screen
   const uint16_t margin = 20;
-  const uint16_t rect_w = (w > margin * 2) ? (w - margin * 2) : w;
-  const uint16_t rect_h = (h > margin * 2) ? (h - margin * 2) : h;
+  const uint16_t w = SCREEN_WIDTH - margin * 2;
+  const uint16_t h = 80;
+  const uint16_t x = margin;
+  const uint16_t y = (SCREEN_HEIGHT - h) / 2;
   const uint16_t radius_outer = 12;
   const uint16_t radius_inner = 10;
+
   // Outer rounded border
-  widget_bg.drawRoundRect(margin, margin, rect_w, rect_h, radius_outer, TFT_RED);
+  tft.drawRoundRect(x, y, w, h, radius_outer, TFT_RED);
   // Inner rounded border to make the frame visually thicker
-  if (rect_w > 6 && rect_h > 6)
+  if (w > 6 && h > 6)
   {
-    widget_bg.drawRoundRect(margin + 2, margin + 2, rect_w - 4, rect_h - 4, radius_inner, TFT_RED);
+    tft.drawRoundRect(x + 2, y + 2, w - 4, h - 4, radius_inner, TFT_RED);
   }
 
-  // Create an inner sprite for the centered text (use transparent background)
-  if (!txt_sprite.createSprite(rect_w, rect_h))
-  {
-    ESP_LOGE("WIDGET", "createSprite for update-processing text failed!");
-    widget_bg.deleteSprite();
-    return false;
-  }
-  txt_sprite.fillSprite(TFT_TRANSPARENT);
-  txt_sprite.loadFont(LittleFS, "/arial_cyr18.vlw");
-  txt_sprite.setTextDatum(MC_DATUM);
-  txt_sprite.setTextColor(TFT_WHITE, TFT_TRANSPARENT);
-  txt_sprite.drawString("Update is processing. Please wait.", rect_w / 2, rect_h / 2);
-  txt_sprite.unloadFont();
+  // Draw text using default built-in font (larger than default)
+  tft.setFont(&fonts::Font4);
+  tft.setTextDatum(MC_DATUM);
+  tft.setTextColor(TFT_WHITE, WIDGET_BG_COLOR);
 
-  // Composite: push the text into the framed rectangle area, then push full-screen
-  txt_sprite.pushSprite(&widget_bg, margin, margin, TFT_TRANSPARENT);
-  txt_sprite.deleteSprite();
+  // Draw two centered lines
+  tft.drawString("Update is processing.", SCREEN_WIDTH / 2, y + h / 2 - 12);
+  tft.drawString("Please wait.", SCREEN_WIDTH / 2, y + h / 2 + 12);
 
-  // Always push to (0,0) so widget covers entire screen
-  widget_bg.pushSprite(0, (SCREEN_HEIGHT - h) / 2, TFT_TRANSPARENT);
-  widget_bg.deleteSprite();
+  // Reset to default font
+  tft.setFont(NULL);
 
   vTaskDelay(pdMS_TO_TICKS(1));
   return true;

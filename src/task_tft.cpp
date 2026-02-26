@@ -50,6 +50,7 @@ void task_tft_exec(void *pvParameters)
   TickType_t lastInSensorTick = 0;
   TickType_t lastOutSensorTick = 0;
   bool f_first = true;
+  bool f_ota_widget_is_drawn = false;
   // Хранение наименования населённого пункта; пока пустая строка
   String cityName = String("");
   // Placeholder external sensor battery level (0..100). Update from NRF handler when available.
@@ -70,7 +71,9 @@ void task_tft_exec(void *pvParameters)
     EventBits_t evt_bits_now = xEventGroupGetBits(xEventGroup);
     if ((evt_bits_now & BIT_OTA_UPDATE_BIT) != 0)
     {
-      meteo_widgets->draw_update_processing_widget();
+      if (!f_ota_widget_is_drawn)
+        meteo_widgets->draw_update_processing_widget();
+      f_ota_widget_is_drawn = true; // Set flag to avoid redrawing the OTA widget repeatedly
       vTaskDelayUntil(&xLastWakeTime, 1000 / portTICK_PERIOD_MS);
       continue; // skip normal updates while OTA is running
     }
