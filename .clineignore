@@ -1,0 +1,94 @@
+# PlatformIO - самое важное!
+# Папка сборки и кеша PlatformIO (сотни мегабайт временных файлов)
+.pio/
+# Папка с установленными библиотеками (часто тысячи файлов)
+.piolibdeps/
+
+# Системные папки версионного контроля
+.git/
+.svn/
+.hg/
+
+# Папки IDE и редакторов
+.vscode/         # настройки VS Code (если не хочешь шарить)
+.idea/           # настройки JetBrains (CLion)
+.vs/             # настройки Visual Studio
+
+# Сборка и кеш компилятора
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.dll
+*.dylib
+*.exe
+*.bin
+*.elf
+*.hex
+# PlatformIO генерирует много бинарных файлов, лучше их исключить
+
+# Системные файлы ОС
+.DS_Store        # macOS
+Thumbs.db        # Windows
+desktop.ini
+
+# Логи и временные файлы
+*.log
+*.tmp
+*.temp
+*.cache
+
+# Документация и ресурсы (обычно не нужны для анализа кода)
+docs/
+*.pdf
+*.jpg
+*.png
+*.gif
+*.bmp
+*.fzz
+# Если нужны изображения для анализа - раскомментируй
+
+etc/
+
+*README
+
+# Тесты и примеры (если их много, можно исключить)
+test/
+examples/
+# Но будь осторожен - иногда там важный код
+
+# Если используешь платформу ESP-IDF напрямую
+managed_components/
+sdkconfig
+sdkconfig.old
+
+# Папка data - особый случай!
+# Игнорируем содержимое бинарных файлов, но оставляем видимыми имена
+/data/**/*.jpg
+/data/**/*.jpeg
+/data/**/*.png
+/data/**/*.gif
+/data/**/*.bmp
+/data/**/*.tiff
+/data/**/*.ico
+/data/**/*.ttf
+/data/**/*.otf
+/data/**/*.woff
+/data/**/*.eot
+/data/**/*.vlw
+/data/**/*.ttf
+
+# Но! Разрешаем видеть текстовые файлы в data, если есть
+# (раскомментируй если нужно)
+# !/data/**/*.txt
+ !/data/**/*.json
+# !/data/**/*.csv
+
+# Остальные временные файлы
+*.log
+*.tmp
+*.cache
+.DS_Store
+Thumbs.db
+.gitignore
