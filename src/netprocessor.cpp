@@ -2,8 +2,6 @@
 #include "http_helpers.h"
 #include <WiFi.h>
 #include <esp_log.h>
-#include <math.h>
-#include <time.h>
 
 // Global NetProcessor instance is owned/constructed by main(); no singletons here.
 
