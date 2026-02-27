@@ -3,7 +3,7 @@ name: Build and Release
 on:
   push:
     tags:
-      - 'v*'
+      - '*'
 
 jobs:
   build:
@@ -23,22 +23,32 @@ jobs:
           pip install --upgrade pip
           pip install platformio
 
-      - name: Build firmware
-        run: pio run -e esp32-s3-wroom-1-N16R8
+      - name: Build firmware и LittleFS образ
+        run: |
+          pio run -e esp32-s3-wroom-1-N16R8
+          pio run -e esp32-s3-wroom-1-N16R8 -t buildfs
 
-      - name: Extract version from tag
+      - name: Извлечь версию из тега
         id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-
-      - name: Create firmware artifact
         run: |
-          cp .pio/build/esp32-s3-wroom-1-N16R8/firmware.bin firmware.bin
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"                    # убираем ведущую 'v', если она есть
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "TAG=$TAG" >> $GITHUB_OUTPUT     # для отладки, если нужно
 
-      - name: Create littlefs artifact
+      - name: Проверить и подготовить файлы
         run: |
-          cp .pio/build/esp32-s3-wroom-1-N16R8/littlefs.bin littlefs.bin
+          SRC_DIR=".pio/build/esp32-s3-wroom-1-N16R8"
+          
+          ls -l "$SRC_DIR/firmware.bin" || { echo "Ошибка: firmware.bin не найден"; exit 1; }
+          ls -l "$SRC_DIR/littlefs.bin" || { echo "Ошибка: littlefs.bin не найден — проверьте папку data/ и board_build.filesystem = littlefs в platformio.ini"; exit 1; }
+          
+          cp "$SRC_DIR/firmware.bin" firmware.bin
+          cp "$SRC_DIR/littlefs.bin" littlefs.bin
+          
+          ls -l firmware.bin littlefs.bin
 
-      - name: Create manifest.json
+      - name: Создать manifest.json
         run: |
           cat > manifest.json << EOF
           {
@@ -51,41 +61,43 @@ jobs:
           }
           EOF
 
-      - name: Upload artifacts
+      - name: Загрузить артефакты
         uses: actions/upload-artifact@v4
         with:
-          name: release-artifacts
+          name: ota-files-${{ steps.version.outputs.VERSION }}
           path: |
             firmware.bin
             littlefs.bin
             manifest.json
+          retention-days: 30
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download artifacts
+      - name: Скачать артефакты
         uses: actions/download-artifact@v4
         with:
-          name: release-artifacts
+          name: ota-files-${{ needs.build.outputs.VERSION }}  # если не сработает — замени на steps.version.outputs.VERSION (см. примечание ниже)
           path: artifacts
 
-      - name: Upload to server
+      - name: Загрузка на сервер
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
           SERVER_USER: ${{ secrets.SERVER_USER }}
         run: |
-          echo "$SSH_PRIVATE_KEY" > private_key.pem
-          chmod 600 private_key.pem
-          
-          # Create remote directory
-          ssh -o StrictHostKeyChecking=no -i private_key.pem $SERVER_USER@$SERVER_HOST "mkdir -p /ota/meteo_station"
-          
-          # Upload files
-          scp -o StrictHostKeyChecking=no -i private_key.pem artifacts/firmware.bin $SERVER_USER@$SERVER_HOST:/ota/meteo_station/
-          scp -o StrictHostKeyChecking=no -i private_key.pem artifacts/littlefs.bin $SERVER_USER@$SERVER_HOST:/ota/meteo_station/
-          scp -o StrictHostKeyChecking=no -i private_key.pem artifacts/manifest.json $SERVER_USER@$SERVER_HOST:/ota/meteo_station/
-          
-          rm private_key.pem
+          echo "$SSH_PRIVATE_KEY" > key.pem
+          chmod 600 key.pem
+
+          ssh -i key.pem -o StrictHostKeyChecking=no \
+            $SERVER_USER@$SERVER_HOST "mkdir -p /ota/meteo_station"
+
+          scp -i key.pem -o StrictHostKeyChecking=no \
+            artifacts/firmware.bin \
+            artifacts/littlefs.bin \
+            artifacts/manifest.json \
+            $SERVER_USER@$SERVER_HOST:/ota/meteo_station/
+
+          rm -f key.pem
