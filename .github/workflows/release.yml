@@ -1,0 +1,91 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install PlatformIO
+        run: |
+          pip install --upgrade pip
+          pip install platformio
+
+      - name: Build firmware
+        run: pio run -e esp32-s3-wroom-1-N16R8
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Create firmware artifact
+        run: |
+          cp .pio/build/esp32-s3-wroom-1-N16R8/firmware.bin firmware.bin
+
+      - name: Create littlefs artifact
+        run: |
+          cp .pio/build/esp32-s3-wroom-1-N16R8/littlefs.bin littlefs.bin
+
+      - name: Create manifest.json
+        run: |
+          cat > manifest.json << EOF
+          {
+            "type": "meteo_station",
+            "version": "${{ steps.version.outputs.VERSION }}",
+            "host": "tag78.ru",
+            "port": 443,
+            "bin": "/ota/meteo_station/firmware.bin",
+            "littlefs": "/ota/meteo_station/littlefs.bin"
+          }
+          EOF
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: |
+            firmware.bin
+            littlefs.bin
+            manifest.json
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-artifacts
+          path: artifacts
+
+      - name: Upload to server
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          echo "$SSH_PRIVATE_KEY" > private_key.pem
+          chmod 600 private_key.pem
+          
+          # Create remote directory
+          ssh -o StrictHostKeyChecking=no -i private_key.pem $SERVER_USER@$SERVER_HOST "mkdir -p /ota/meteo_station"
+          
+          # Upload files
+          scp -o StrictHostKeyChecking=no -i private_key.pem artifacts/firmware.bin $SERVER_USER@$SERVER_HOST:/ota/meteo_station/
+          scp -o StrictHostKeyChecking=no -i private_key.pem artifacts/littlefs.bin $SERVER_USER@$SERVER_HOST:/ota/meteo_station/
+          scp -o StrictHostKeyChecking=no -i private_key.pem artifacts/manifest.json $SERVER_USER@$SERVER_HOST:/ota/meteo_station/
+          
+          rm private_key.pem
