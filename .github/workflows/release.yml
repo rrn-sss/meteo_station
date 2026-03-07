@@ -97,12 +97,12 @@ jobs:
           chmod 600 key.pem
 
           ssh -i key.pem -o StrictHostKeyChecking=no -p ${{ secrets.SSH_PORT || 22 }} \
-            $SERVER_USER@$SERVER_HOST "mkdir -p /ota/meteo_station"
+            $SERVER_USER@$SERVER_HOST "mkdir -p /var/www/ota/meteo_station"
 
           scp -i key.pem -o StrictHostKeyChecking=no -P ${{ secrets.SSH_PORT || 22 }} \
             "artifacts/firmware_${VERSION}.bin" \
             "artifacts/littlefs_${VERSION}.bin" \
             artifacts/manifest.json \
-            $SERVER_USER@$SERVER_HOST:/ota/meteo_station/
+            $SERVER_USER@$SERVER_HOST:/var/www/ota/meteo_station/
 
           rm -f key.pem
