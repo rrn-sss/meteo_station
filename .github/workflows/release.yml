@@ -96,10 +96,10 @@ jobs:
           echo "$SSH_PRIVATE_KEY" > key.pem
           chmod 600 key.pem
 
-          ssh -i key.pem -o StrictHostKeyChecking=no \
+          ssh -i key.pem -o StrictHostKeyChecking=no -p ${{ secrets.SSH_PORT || 22 }} \
             $SERVER_USER@$SERVER_HOST "mkdir -p /ota/meteo_station"
 
-          scp -i key.pem -o StrictHostKeyChecking=no \
+          scp -i key.pem -o StrictHostKeyChecking=no -P ${{ secrets.SSH_PORT || 22 }} \
             "artifacts/firmware_${VERSION}.bin" \
             "artifacts/littlefs_${VERSION}.bin" \
             artifacts/manifest.json \
