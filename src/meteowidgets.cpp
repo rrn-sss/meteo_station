@@ -1,4 +1,4 @@
-#include "MeteoWidgets.h"
+#include "meteowidgets.h"
 #include "tasks_common.h"
 #include <cmath>
 #include <ctime>
