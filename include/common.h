@@ -5,8 +5,8 @@
 #include <LovyanGFX.hpp>
 #include <WString.h>
 #include <freertos/FreeRTOS.h>
-#include <freertos/Queue.h>
 #include <freertos/event_groups.h>
+#include <freertos/queue.h>
 
 // I2C pins for BME280
 #define I2C_SDA_PIN 8
