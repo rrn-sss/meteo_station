@@ -1,7 +1,7 @@
 #include "openmeteo.h"
 #include "http_helpers.h"
 #include "netprocessor.h"
-#include <ArduinoJSON.h>
+#include <ArduinoJson.h>
 #include <WiFi.h>
 #include <esp_log.h>
 #include <type_traits>
