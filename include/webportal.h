@@ -16,10 +16,11 @@ public:
   bool set_config(const PrjCfgData &cfg);
 
   String getWiFiSSID();
-
   String getWiFiPass();
 
 private:
+  void apply_custom_ui();
+
   WiFiManager &wm;
   int timeout = 120; // время выполнения в секундах
   WiFiManagerParameter custom_mqtt_server;
