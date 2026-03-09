@@ -1,8 +1,8 @@
 {
     "mqtt_server": "tag78.ru",
     "mqtt_port": "1883",
-    "mqtt_user": "tag78",
-    "mqtt_pass": "zalp2678",
+    "mqtt_user": "mqtt_username",
+    "mqtt_pass": "mqtt_password",
     "mqtt_prefix": "meteo_station",
     "bot_token": "XXXXXXXXXX:YYYYYYYYYYYYYYYYYYYYY",
     "bot_chat_id": "-ZZZZZZZZZZZZZ",
