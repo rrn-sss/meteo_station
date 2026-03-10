@@ -1,8 +1,6 @@
 #ifndef _WEBPORTAL_H_
 #define _WEBPORTAL_H_
 #include "common.h"
-#include <FS.h> // должен быть включён первым, иначе может привести к сбоям
-#include <LittleFS.h>
 #include <WiFiManager.h> //https://github.com/tzapu/WiFiManager
 
 class WebConfig

@@ -7,10 +7,7 @@
 
 #include "webportal.h"
 #include "common.h"
-#include "tasks_common.h"
-#include <ArduinoJson.h>
-#include <HTTPClient.h>
-#include <LittleFS.h>
+#include "nvscfg.h"
 #include <WiFiUdp.h>
 #include <atomic>
 
@@ -276,6 +273,9 @@ void WebConfig::process_autoconnect_or_config(bool f_on_demand)
   if (!f_on_demand && WiFi.status() == WL_CONNECTED)
     return;
 
+  // Миграция конфигурации из LittleFS в NVS (при первом запуске после обновления)
+  NvsCfg::migrate(/*delete_old_file=*/true);
+
   // читаем конфигурацию перед запуском портала конфигурирования
   const bool configOk = get_config(cfg);
   if (configOk)
@@ -365,102 +365,13 @@ void WebConfig::process_autoconnect_or_config(bool f_on_demand)
 // ---------------------------------------------------------------------------
 bool WebConfig::get_config(PrjCfgData &cfg)
 {
-  bool ret = true;
-
-  if (xSemaphoreTake(xLittleFSMutex, pdMS_TO_TICKS(2000)) != pdTRUE)
-  {
-    ESP_LOGE(TAG, "Failed to acquire LittleFS mutex for get_config");
-    return false;
-  }
-
-  ESP_LOGI(TAG, "LittleFS mounted");
-  if (LittleFS.exists("/config.json"))
-  {
-    ESP_LOGI(TAG, "Reading config file...");
-    File configFile = LittleFS.open("/config.json", "r");
-    if (configFile)
-    {
-      const size_t sz = configFile.size();
-      std::unique_ptr<char[]> buf(new char[sz + 1]());
-      configFile.readBytes(buf.get(), sz);
-      configFile.close();
-
-      JsonDocument json;
-      const auto err = deserializeJson(json, buf.get());
-      if (!err)
-      {
-        strncpy(cfg.mqtt_server, json["mqtt_server"] | cfg.mqtt_server, sizeof(cfg.mqtt_server) - 1);
-        strncpy(cfg.mqtt_port, json["mqtt_port"] | cfg.mqtt_port, sizeof(cfg.mqtt_port) - 1);
-        strncpy(cfg.mqtt_user, json["mqtt_user"] | cfg.mqtt_user, sizeof(cfg.mqtt_user) - 1);
-        strncpy(cfg.mqtt_pass, json["mqtt_pass"] | cfg.mqtt_pass, sizeof(cfg.mqtt_pass) - 1);
-        strncpy(cfg.mqtt_prefix, json["mqtt_prefix"] | cfg.mqtt_prefix, sizeof(cfg.mqtt_prefix) - 1);
-        strncpy(cfg.bot_token, json["bot_token"] | cfg.bot_token, sizeof(cfg.bot_token) - 1);
-        strncpy(cfg.bot_chat_id, json["bot_chat_id"] | cfg.bot_chat_id, sizeof(cfg.bot_chat_id) - 1);
-        strncpy(cfg.latitude, json["latitude"] | cfg.latitude, sizeof(cfg.latitude) - 1);
-        strncpy(cfg.longitude, json["longitude"] | cfg.longitude, sizeof(cfg.longitude) - 1);
-        strncpy(cfg.gmt_offset_sec, json["gmt_offset_sec"] | cfg.gmt_offset_sec, sizeof(cfg.gmt_offset_sec) - 1);
-
-        ESP_LOGI(TAG, "Config parsed OK");
-      }
-      else
-      {
-        ESP_LOGE(TAG, "Failed to parse JSON config: %s", err.c_str());
-        ret = false;
-      }
-    }
-    else
-    {
-      ESP_LOGE(TAG, "Failed to open config.json");
-      ret = false;
-    }
-  }
-  else
-  {
-    ESP_LOGW(TAG, "config.json not found — using defaults");
-    ret = false;
-  }
-
-  xSemaphoreGive(xLittleFSMutex);
-  return ret;
+  return NvsCfg::load(cfg);
 }
 
 // ---------------------------------------------------------------------------
 bool WebConfig::set_config(const PrjCfgData &cfg)
 {
-  ESP_LOGI(TAG, "Saving config...");
-
-  if (xSemaphoreTake(xLittleFSMutex, pdMS_TO_TICKS(2000)) != pdTRUE)
-  {
-    ESP_LOGE(TAG, "Failed to acquire LittleFS mutex for set_config");
-    return false;
-  }
-
-  JsonDocument json;
-  json["mqtt_server"] = cfg.mqtt_server;
-  json["mqtt_port"] = cfg.mqtt_port;
-  json["mqtt_user"] = cfg.mqtt_user;
-  json["mqtt_pass"] = cfg.mqtt_pass;
-  json["mqtt_prefix"] = cfg.mqtt_prefix;
-  json["bot_token"] = cfg.bot_token;
-  json["bot_chat_id"] = cfg.bot_chat_id;
-  json["latitude"] = cfg.latitude;
-  json["longitude"] = cfg.longitude;
-  json["gmt_offset_sec"] = cfg.gmt_offset_sec;
-
-  File configFile = LittleFS.open("/config.json", "w");
-  if (!configFile)
-  {
-    ESP_LOGE(TAG, "Failed to open config.json for writing");
-    xSemaphoreGive(xLittleFSMutex);
-    return false;
-  }
-
-  serializeJson(json, configFile);
-  configFile.close();
-
-  xSemaphoreGive(xLittleFSMutex);
-  ESP_LOGI(TAG, "Config saved");
-  return true;
+  return NvsCfg::save(cfg);
 }
 
 // ---------------------------------------------------------------------------
