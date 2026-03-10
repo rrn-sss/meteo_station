@@ -56,7 +56,10 @@ void MqttSender::loop(const PrjCfgData &cfg)
     if (connect(cfg))
       xEventGroupSetBits(xEventGroup, BIT_MQTT_STATE_UP);
     else
+    {
       xEventGroupClearBits(xEventGroup, BIT_MQTT_STATE_UP);
+      vTaskDelay(pdMS_TO_TICKS(5000)); // Wait before retrying
+    }
   }
   else
   {
