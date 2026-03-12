@@ -5,6 +5,9 @@
 
 static const char *TAG = "MQTTSENDER";
 
+// Интервал повторного подключения к MQTT при неудаче (мс)
+static const uint32_t MQTT_RECONNECT_INTERVAL_MS = 30000;
+
 // Static callback for incoming MQTT messages
 static void mqtt_callback(char *topic, byte *payload, unsigned int length)
 {
@@ -12,7 +15,7 @@ static void mqtt_callback(char *topic, byte *payload, unsigned int length)
 }
 
 MqttSender::MqttSender(QueueHandle_t (&queue_array_ref)[_PROTASK_NUM_])
-    : xQueues(queue_array_ref), wifiClient(), mqttClient(wifiClient)
+    : xQueues(queue_array_ref), wifiClient(), mqttClient(wifiClient), lastConnectAttemptMs(0)
 {
   ESP_LOGI(TAG, "MqttSender constructed");
 }
@@ -50,15 +53,20 @@ bool MqttSender::connect(const PrjCfgData &cfg)
 
 void MqttSender::loop(const PrjCfgData &cfg)
 {
-  // If not connected, try to connect and update the global event bit
+  // If not connected, try to connect (non-blocking with interval)
   if (!mqttClient.connected())
   {
-    if (connect(cfg))
-      xEventGroupSetBits(xEventGroup, BIT_MQTT_STATE_UP);
-    else
+    uint32_t nowMs = millis();
+    // Handle millis() overflow
+    uint32_t elapsed = (nowMs >= lastConnectAttemptMs) ? (nowMs - lastConnectAttemptMs) : (UINT32_MAX - lastConnectAttemptMs + nowMs + 1);
+
+    if (lastConnectAttemptMs == 0 || elapsed >= MQTT_RECONNECT_INTERVAL_MS)
     {
-      xEventGroupClearBits(xEventGroup, BIT_MQTT_STATE_UP);
-      vTaskDelay(pdMS_TO_TICKS(5000)); // Wait before retrying
+      lastConnectAttemptMs = nowMs;
+      if (connect(cfg))
+        xEventGroupSetBits(xEventGroup, BIT_MQTT_STATE_UP);
+      else
+        xEventGroupClearBits(xEventGroup, BIT_MQTT_STATE_UP);
     }
   }
   else

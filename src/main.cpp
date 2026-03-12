@@ -56,7 +56,7 @@ void setup(void)
   if (!LittleFS.begin())
   {
     ESP_LOGE("MAIN", "LittleFS Mount Failed, restart ESP...");
-    delay(3000);
+    vTaskDelay(pdMS_TO_TICKS(3000));
     ESP.restart();
   }
 
@@ -64,7 +64,7 @@ void setup(void)
   if (!Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN))
   {
     ESP_LOGE("MAIN", "I2C initialization failed, restart ESP...");
-    delay(3000);
+    vTaskDelay(pdMS_TO_TICKS(3000));
     ESP.restart();
   }
 
@@ -73,7 +73,7 @@ void setup(void)
   if (!xLittleFSMutex)
   {
     ESP_LOGE("MAIN", "LittleFS mutex is not created, restart ESP...");
-    delay(3000);
+    vTaskDelay(pdMS_TO_TICKS(3000));
     ESP.restart();
   }
 
@@ -83,7 +83,7 @@ void setup(void)
   if (!xEventGroup)
   {
     ESP_LOGE("MAIN", "Event group is not created, restart ESP...");
-    delay(5000);
+    vTaskDelay(pdMS_TO_TICKS(5000));
     ESP.restart();
   }
 
@@ -95,7 +95,7 @@ void setup(void)
     if (!xQueue[i])
     {
       ESP_LOGE("MAIN", "Queue %d is not created, restart ESP...", i);
-      delay(5000);
+      vTaskDelay(pdMS_TO_TICKS(5000));
       ESP.restart();
     }
   }
@@ -114,7 +114,7 @@ void setup(void)
   if (xHandles[PROTASK_TFT] == NULL)
   {
     ESP_LOGE("MAIN", "TFT Task is not created, restart ESP...");
-    delay(5000);
+    vTaskDelay(pdMS_TO_TICKS(5000));
     ESP.restart();
   }
 
@@ -131,7 +131,7 @@ void setup(void)
   if (xHandles[PROTASK_NETWORKING] == NULL)
   {
     ESP_LOGE("MAIN", "NETWORKING Task is not created, restart ESP...");
-    delay(5000);
+    vTaskDelay(pdMS_TO_TICKS(5000));
     ESP.restart();
   }
 
@@ -148,7 +148,7 @@ void setup(void)
   if (xHandles[PROTASK_HOME_SENSOR] == NULL)
   {
     ESP_LOGE("MAIN", "HOME_SENSOR Task is not created, restart ESP...");
-    delay(5000);
+    vTaskDelay(pdMS_TO_TICKS(5000));
     ESP.restart();
   }
 
@@ -165,7 +165,7 @@ void setup(void)
   if (xHandles[PROTASK_NRF_RECEIVER] == NULL)
   {
     ESP_LOGE("MAIN", "NRF24 Task is not created, restart ESP...");
-    delay(5000);
+    vTaskDelay(pdMS_TO_TICKS(5000));
     ESP.restart();
   }
 
@@ -183,7 +183,7 @@ void setup(void)
   if (xHandles[PROTASK_OTA] == NULL)
   {
     ESP_LOGE("MAIN", "OTA Task is not created, restart ESP...");
-    delay(5000);
+    vTaskDelay(pdMS_TO_TICKS(5000));
     ESP.restart();
   }
 

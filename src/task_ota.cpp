@@ -1,4 +1,5 @@
 #include "task_ota.h"
+#include "certs.h"
 #include "common.h"
 #include "stack_monitor.h"
 #include <Preferences.h>
@@ -77,8 +78,11 @@ void task_ota_exec(void *pvParameters)
   //   firmwareType    — имя прошивки (должно совпадать с полем "name" в manifest.json)
   //   currentVersion  — текущая версия прошивки
   //   validate        — проверять MD5/SHA256 (false = не проверять)
-  //   allow_insecure  — разрешить HTTPS без проверки сертификата (true = разрешить)
-  esp32FOTA fota("meteo_station", nvsVersion.c_str(), false, true);
+  //   allow_insecure  — разрешить HTTPS без проверки сертификата (false = проверять сертификат)
+  esp32FOTA fota("meteo_station", nvsVersion.c_str(), false, false);
+  // Установить CA-сертификат для проверки HTTPS
+  CryptoMemAsset root_ca("ISRG Root X1", CERT_ISRG_ROOT_X1, strlen(CERT_ISRG_ROOT_X1));
+  fota.setRootCA(&root_ca);
   // Указать URL манифеста через API библиотеки
   fota.setManifestURL(OTA_MANIFEST_URL);
 

@@ -6,6 +6,21 @@
 #include <esp_log.h>
 #include <time.h>
 
+// Helper macro for LittleFS mutex protection
+#define LITTLEFS_LOCK()                              \
+  do                                                 \
+  {                                                  \
+    if (xLittleFSMutex)                              \
+      xSemaphoreTake(xLittleFSMutex, portMAX_DELAY); \
+  } while (0)
+
+#define LITTLEFS_UNLOCK()             \
+  do                                  \
+  {                                   \
+    if (xLittleFSMutex)               \
+      xSemaphoreGive(xLittleFSMutex); \
+  } while (0)
+
 LGFX tft; // Создать экземпляр LovyanGFX (драйвер дисплея)
 
 void task_tft_exec(void *pvParameters)
@@ -19,7 +34,9 @@ void task_tft_exec(void *pvParameters)
     ESP_LOGE("TFT", "LovyanGFX initialization failed, deleting task...");
     vTaskDelete(NULL); // ошибка инициализации, удаляем задачу
   }
+  LITTLEFS_LOCK();
   tft.setFileStorage(LittleFS);
+  LITTLEFS_UNLOCK();
 
   if (!meteo_widgets)
   {

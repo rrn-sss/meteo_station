@@ -134,7 +134,7 @@ void task_home_sensor_exec(void *pvParameters)
       }
     }
 
-    // Интервал опроса 10 секунд
+    // Интервал опроса 60 секунд
     vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(60000));
   }
 

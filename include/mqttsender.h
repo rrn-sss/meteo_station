@@ -26,6 +26,9 @@ private:
   WiFiClient wifiClient;
   PubSubClient mqttClient;
 
+  // Время последней попытки подключения к MQTT (мс)
+  uint32_t lastConnectAttemptMs;
+
   // запрет копирования/перемещения
   MqttSender(const MqttSender &) = delete;
   MqttSender &operator=(const MqttSender &) = delete;
