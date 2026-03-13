@@ -3,6 +3,7 @@
 #include "openmeteo.h"
 #include "stack_monitor.h"
 #include "tasks_common.h"
+#include <esp_heap_caps.h>
 #include <esp_log.h>
 #include <time.h>
 
@@ -351,6 +352,13 @@ void task_tft_exec(void *pvParameters)
           float kp = (idx == METEO_DATA_FORECAST_TODAY)      ? geomag.kpmax_today
                      : (idx == METEO_DATA_FORECAST_TOMORROW) ? geomag.kpmax_tomorrow
                                                              : geomag.kpmax_tomorrow2;
+
+          // Log heap state before forecast widget for debugging
+          ESP_LOGI("HEAP", "Before forecast[%d]: Free: %u, largest block: %u, PSRAM free: %u",
+                   idx,
+                   heap_caps_get_free_size(MALLOC_CAP_DEFAULT),
+                   heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT),
+                   heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
 
           meteo_widgets->draw_meteo_forecast_widget(x, y,
                                                     d.temperature_min,

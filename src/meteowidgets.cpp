@@ -2,6 +2,7 @@
 #include "tasks_common.h"
 #include <cmath>
 #include <ctime>
+#include <esp_heap_caps.h>
 #include <esp_log.h>
 #include <time.h>
 
@@ -374,18 +375,38 @@ bool MeteoWidgets::draw_wind_widget(float wind_speed, uint16_t wind_dir, lgfx::L
   }
   widget_bg_for_wind.fillSprite(WIDGET_BG_COLOR);
 
-  sprite_48.createSprite(WIND_ICON_WH, WIND_ICON_WH);
-  rotated_48_sprite.createSprite(WIND_ICON_WH, WIND_ICON_WH);
-  if (draw_png_2_sprite(WIND_PNG_NAME, sprite_48))
+  // Create wind icon sprites with heap checks
+  bool sprite_48_ok = sprite_48.createSprite(WIND_ICON_WH, WIND_ICON_WH);
+  bool rotated_48_ok = rotated_48_sprite.createSprite(WIND_ICON_WH, WIND_ICON_WH);
+
+  if (!sprite_48_ok)
+  {
+    ESP_LOGE("WIDGET", "createSprite(sprite_48) failed in wind widget! Heap largest free block: %u", heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
+  }
+  if (!rotated_48_ok)
+  {
+    ESP_LOGE("WIDGET", "createSprite(rotated_48_sprite) failed in wind widget! Heap largest free block: %u", heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
+  }
+
+  if (sprite_48_ok && rotated_48_ok && draw_png_2_sprite(WIND_PNG_NAME, sprite_48))
   {
     sprite_48.setPivot(WIND_ICON_WH / 2, WIND_ICON_WH / 2);
     rotated_48_sprite.fillSprite(TFT_BLACK);
     sprite_48.pushRotated(&rotated_48_sprite, (wind_dir + 180) % 360, TFT_BLACK);
     rotated_48_sprite.pushSprite(&widget_bg_for_wind, (WIDGET_FOR_WIND_W - WIND_ICON_WH) / 2, -4, TFT_BLACK);
   }
-  rotated_48_sprite.deleteSprite();
-  sprite_48.deleteSprite();
+  if (rotated_48_ok)
+    rotated_48_sprite.deleteSprite();
+  if (sprite_48_ok)
+    sprite_48.deleteSprite();
 
+  // Acquire mutex before loading font
+  if (xSemaphoreTake(xLittleFSMutex, pdMS_TO_TICKS(1000)) != pdTRUE)
+  {
+    ESP_LOGE("WIDGET", "Failed to acquire LittleFS mutex for font in wind widget");
+    widget_bg_for_wind.deleteSprite();
+    return false;
+  }
   widget_bg_for_wind.loadFont(LittleFS, "/arial_cyr18.vlw");
 
   String wind_dir_str = "";
@@ -408,15 +429,32 @@ bool MeteoWidgets::draw_wind_widget(float wind_speed, uint16_t wind_dir, lgfx::L
 
   widget_bg_for_wind.drawString(wind_dir_str, WIDGET_FOR_WIND_W / 2 - (wind_dir_str.length() > 2 ? 10 : 6), WIND_ICON_WH * 0.9f - 6);
   widget_bg_for_wind.unloadFont();
+  xSemaphoreGive(xLittleFSMutex); // Release mutex after font operations
 
-  windtxt_for_sprite.createSprite(WINDTXT_FOR_WIND_W, WINDTXT_FOR_WIND_H);
-  windtxt_for_sprite.fillSprite(TFT_TRANSPARENT);
-  windtxt_for_sprite.loadFont(LittleFS, "/arial_cyr18.vlw");
-  windtxt_for_sprite.setTextDatum(MC_DATUM);
-  windtxt_for_sprite.drawString(String(static_cast<uint8_t>(std::round(wind_speed))) + " м/с", WINDTXT_FOR_WIND_W / 2, WINDTXT_FOR_WIND_H / 2);
-  windtxt_for_sprite.unloadFont();
-  windtxt_for_sprite.pushSprite(&widget_bg_for_wind, 0, WIDGET_FOR_WIND_H - WINDTXT_FOR_WIND_H, TFT_TRANSPARENT);
-  windtxt_for_sprite.deleteSprite();
+  // Create wind text sprite with heap check
+  if (!windtxt_for_sprite.createSprite(WINDTXT_FOR_WIND_W, WINDTXT_FOR_WIND_H))
+  {
+    ESP_LOGE("WIDGET", "createSprite(windtxt_for_sprite) failed! Heap largest free block: %u", heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
+  }
+  else
+  {
+    windtxt_for_sprite.fillSprite(TFT_TRANSPARENT);
+    // Acquire mutex for font loading
+    if (xSemaphoreTake(xLittleFSMutex, pdMS_TO_TICKS(1000)) != pdTRUE)
+    {
+      ESP_LOGE("WIDGET", "Failed to acquire LittleFS mutex for windtxt font");
+      windtxt_for_sprite.deleteSprite();
+      widget_bg_for_wind.deleteSprite();
+      return false;
+    }
+    windtxt_for_sprite.loadFont(LittleFS, "/arial_cyr18.vlw");
+    windtxt_for_sprite.setTextDatum(MC_DATUM);
+    windtxt_for_sprite.drawString(String(static_cast<uint8_t>(std::round(wind_speed))) + " м/с", WINDTXT_FOR_WIND_W / 2, WINDTXT_FOR_WIND_H / 2);
+    windtxt_for_sprite.unloadFont();
+    xSemaphoreGive(xLittleFSMutex); // Release mutex after font operations
+    windtxt_for_sprite.pushSprite(&widget_bg_for_wind, 0, WIDGET_FOR_WIND_H - WINDTXT_FOR_WIND_H, TFT_TRANSPARENT);
+    windtxt_for_sprite.deleteSprite();
+  }
 
   widget_bg_for_wind.pushSprite(&nested_sprite, nested_pos_x, nested_pos_y, TFT_BLACK);
 
@@ -438,15 +476,30 @@ bool MeteoWidgets::draw_humidity_widget(uint8_t humidity, lgfx::LGFX_Sprite &nes
   }
   humidity_bg.fillSprite(WIDGET_BG_COLOR);
 
-  sprite_48.createSprite(HUMIDITY_ICON_WH, HUMIDITY_ICON_WH);
+  // Create humidity icon sprite with heap check
+  if (!sprite_48.createSprite(HUMIDITY_ICON_WH, HUMIDITY_ICON_WH))
+  {
+    ESP_LOGE("WIDGET", "createSprite(sprite_48) failed in humidity widget! Heap largest free block: %u", heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
+  }
+  else
+  {
+    if (draw_png_2_sprite(HUMIDITY_PNG_NAME, sprite_48))
+      sprite_48.pushSprite(&humidity_bg, 0, 0, TFT_TRANSPARENT);
+  }
 
-  if (draw_png_2_sprite(HUMIDITY_PNG_NAME, sprite_48))
-    sprite_48.pushSprite(&humidity_bg, 0, 0, TFT_TRANSPARENT);
-
+  // Acquire mutex before loading font
+  if (xSemaphoreTake(xLittleFSMutex, pdMS_TO_TICKS(1000)) != pdTRUE)
+  {
+    ESP_LOGE("WIDGET", "Failed to acquire LittleFS mutex for humidity font");
+    sprite_48.deleteSprite();
+    humidity_bg.deleteSprite();
+    return false;
+  }
   humidity_bg.loadFont(LittleFS, "/arial_cyr32.vlw");
   humidity_bg.setTextDatum(TC_DATUM);
   humidity_bg.drawString(String(humidity), HUMIDITY_SPRITE_W / 2, HUMIDITY_SPRITE_H / 2 - 6);
   humidity_bg.unloadFont();
+  xSemaphoreGive(xLittleFSMutex); // Release mutex after font operations
 
   humidity_bg.pushSprite(&nested_sprite, nested_pos_x, nested_pos_y, TFT_BLACK);
 
@@ -470,11 +523,17 @@ bool MeteoWidgets::draw_geomagnetic_widget(uint8_t kr, lgfx::LGFX_Sprite &nested
   }
   bg_sprite.fillSprite(WIDGET_BG_COLOR);
 
-  sprite_24.createSprite(GEOMAGNETIC_SPRITE_WH, GEOMAGNETIC_SPRITE_WH);
-
-  String strname = "/icons/" + String(GEOMAGNETIC_SPRITE_WH) + "/" + "kr" + String(kr) + "_" + String(GEOMAGNETIC_SPRITE_WH) + ".png";
-  if (draw_png_2_sprite(strname, sprite_24))
-    sprite_24.pushSprite(&bg_sprite, 0, 0, TFT_TRANSPARENT);
+  // Create geomagnetic icon sprite with heap check
+  if (!sprite_24.createSprite(GEOMAGNETIC_SPRITE_WH, GEOMAGNETIC_SPRITE_WH))
+  {
+    ESP_LOGE("WIDGET", "createSprite(sprite_24) failed in geomagnetic widget! Heap largest free block: %u", heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
+  }
+  else
+  {
+    String strname = "/icons/" + String(GEOMAGNETIC_SPRITE_WH) + "/" + "kr" + String(kr) + "_" + String(GEOMAGNETIC_SPRITE_WH) + ".png";
+    if (draw_png_2_sprite(strname, sprite_24))
+      sprite_24.pushSprite(&bg_sprite, 0, 0, TFT_TRANSPARENT);
+  }
 
   bg_sprite.pushSprite(&nested_sprite, nested_pos_x, nested_pos_y, TFT_BLACK);
 
@@ -551,15 +610,31 @@ bool MeteoWidgets::draw_meteo_current_info_widget(int scr_x_pos, int scr_y_pos, 
     draw_wind_widget(wind_speed, wind_dir, info_sprite, (ICON_WH - WIDGET_FOR_WIND_W), TEMP_CUR_SPRITE_H - 5);
 
     lgfx::LGFX_Sprite temp_cur_sprite(&tft);
-    temp_cur_sprite.createSprite(TEMP_CUR_SPRITE_W, TEMP_CUR_SPRITE_H);
-    temp_cur_sprite.setTextColor(getTempColor(cur_temp), TFT_TRANSPARENT);
-    temp_cur_sprite.fillSprite(TFT_TRANSPARENT);
-    temp_cur_sprite.loadFont(LittleFS, "/arial_cyr56.vlw");
-    temp_cur_sprite.setTextDatum(MC_DATUM);
-    temp_cur_sprite.drawString(String(static_cast<int8_t>(round(cur_temp))) + "°", TEMP_CUR_SPRITE_W / 2, TEMP_CUR_SPRITE_H / 2);
-    temp_cur_sprite.unloadFont();
-    temp_cur_sprite.pushSprite(&info_sprite, 4, 0, TFT_TRANSPARENT);
-    temp_cur_sprite.deleteSprite();
+    // Create temperature sprite with heap check
+    if (!temp_cur_sprite.createSprite(TEMP_CUR_SPRITE_W, TEMP_CUR_SPRITE_H))
+    {
+      ESP_LOGE("WIDGET", "createSprite(temp_cur_sprite) failed in current info! Heap largest free block: %u", heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
+    }
+    else
+    {
+      temp_cur_sprite.setTextColor(getTempColor(cur_temp), TFT_TRANSPARENT);
+      temp_cur_sprite.fillSprite(TFT_TRANSPARENT);
+      // Acquire mutex before loading font
+      if (xSemaphoreTake(xLittleFSMutex, pdMS_TO_TICKS(1000)) != pdTRUE)
+      {
+        ESP_LOGE("WIDGET", "Failed to acquire LittleFS mutex for current info font");
+        temp_cur_sprite.deleteSprite();
+        info_sprite.deleteSprite();
+        return false;
+      }
+      temp_cur_sprite.loadFont(LittleFS, "/arial_cyr56.vlw");
+      temp_cur_sprite.setTextDatum(MC_DATUM);
+      temp_cur_sprite.drawString(String(static_cast<int8_t>(round(cur_temp))) + "°", TEMP_CUR_SPRITE_W / 2, TEMP_CUR_SPRITE_H / 2);
+      temp_cur_sprite.unloadFont();
+      xSemaphoreGive(xLittleFSMutex); // Release mutex after font operations
+      temp_cur_sprite.pushSprite(&info_sprite, 4, 0, TFT_TRANSPARENT);
+      temp_cur_sprite.deleteSprite();
+    }
   }
 
   // push info sprite so it aligns with icon and reproduces original appearance
@@ -578,6 +653,13 @@ bool MeteoWidgets::draw_meteo_forecast_widget(int scr_x_pos, int scr_y_pos, floa
   lgfx::LGFX_Sprite day_for_sprite(&tft);
   lgfx::LGFX_Sprite precip_for_sprite(&tft);
 
+  // Enable PSRAM for large sprites to avoid internal heap fragmentation
+  widget_bg_for_sprite.setPsram(true);
+  sprite_128.setPsram(true);
+  temp_for_sprite.setPsram(true);
+  day_for_sprite.setPsram(true);
+  precip_for_sprite.setPsram(true);
+
   if (!widget_bg_for_sprite.createSprite(WIDGET_FOR_W, WIDGET_FOR_H))
   {
     ESP_LOGE("WIDGET", "createSprite failed!");
@@ -589,53 +671,114 @@ bool MeteoWidgets::draw_meteo_forecast_widget(int scr_x_pos, int scr_y_pos, floa
 
   if (valid)
   {
-    draw_wind_widget(wind_speed, wind_dir, widget_bg_for_sprite, WIDGET_FOR_W - WIDGET_FOR_WIND_W, TEMP_FOR_SPRITE_H - 5);
-
-    sprite_128.createSprite(ICON_WH, ICON_WH);
-    WeatherInfo wi = getWeatherInfo(weather_code);
-    String strname = wi.iconName;
-    strname = "/icons/" + String(ICON_WH) + "/" + strname;
-    if (draw_png_2_sprite(strname, sprite_128))
-      sprite_128.pushSprite(&widget_bg_for_sprite, 0, 0, TFT_BLACK);
-    sprite_128.deleteSprite();
-
-    temp_for_sprite.createSprite(TEMP_FOR_SPRITE_W, TEMP_FOR_SPRITE_H);
-    temp_for_sprite.fillSprite(TFT_TRANSPARENT);
-    temp_for_sprite.loadFont(LittleFS, "/arial_cyr32.vlw");
-    temp_for_sprite.setTextDatum(BC_DATUM);
-    temp_for_sprite.setTextColor(getTempColor(max_temp), TFT_TRANSPARENT);
-    temp_for_sprite.drawString(String(static_cast<int8_t>(round(max_temp))) + "°",
-                               TEMP_FOR_SPRITE_W / 2, TEMP_FOR_SPRITE_H / 2);
-    temp_for_sprite.setTextDatum(TC_DATUM);
-    temp_for_sprite.setTextColor(getTempColor(min_temp), TFT_TRANSPARENT);
-    temp_for_sprite.drawString(String(static_cast<int8_t>(round(min_temp))) + "°",
-                               TEMP_FOR_SPRITE_W / 2, TEMP_FOR_SPRITE_H / 2 - 8);
-    temp_for_sprite.unloadFont();
-    temp_for_sprite.pushSprite(&widget_bg_for_sprite, WIDGET_FOR_W - TEMP_FOR_SPRITE_W, 4, TFT_TRANSPARENT);
-    temp_for_sprite.deleteSprite();
-
-    day_for_sprite.createSprite(DAY_FOR_SPRITE_W, DAY_FOR_SPRITE_H);
-    day_for_sprite.setTextColor(TFT_WHITE, TFT_TRANSPARENT);
-    day_for_sprite.fillSprite(TFT_TRANSPARENT);
-    day_for_sprite.loadFont(LittleFS, "/arial_cyr18.vlw");
-    day_for_sprite.setTextDatum(MC_DATUM);
-    day_for_sprite.drawString(data, DAY_FOR_SPRITE_W / 2, DAY_FOR_SPRITE_H / 2);
-    day_for_sprite.unloadFont();
-    day_for_sprite.pushSprite(&widget_bg_for_sprite, 0, 0, TFT_TRANSPARENT);
-    day_for_sprite.deleteSprite();
-
-    precip_for_sprite.createSprite(PRECIP_FOR_SPRITE_W, PRECIP_FOR_SPRITE_H);
-    precip_for_sprite.setTextColor(TFT_WHITE, TFT_TRANSPARENT);
-    precip_for_sprite.fillSprite(TFT_TRANSPARENT);
-    if (precip_sum > 0)
+    // Draw wind widget first
+    if (!draw_wind_widget(wind_speed, wind_dir, widget_bg_for_sprite, WIDGET_FOR_W - WIDGET_FOR_WIND_W, TEMP_FOR_SPRITE_H - 5))
     {
-      precip_for_sprite.loadFont(LittleFS, "/arial_cyr18.vlw");
-      precip_for_sprite.setTextDatum(MR_DATUM);
-      precip_for_sprite.drawString(String(precip_sum) + " мм.", PRECIP_FOR_SPRITE_W / 2, PRECIP_FOR_SPRITE_H / 2);
-      precip_for_sprite.unloadFont();
+      ESP_LOGW("WIDGET", "draw_wind_widget failed in forecast widget");
     }
-    precip_for_sprite.pushSprite(&widget_bg_for_sprite, 0, WIDGET_FOR_H - PRECIP_FOR_SPRITE_H, TFT_TRANSPARENT);
-    precip_for_sprite.deleteSprite();
+
+    // Create weather icon sprite with heap check (128x128 = 32KB)
+    if (!sprite_128.createSprite(ICON_WH, ICON_WH))
+    {
+      ESP_LOGE("WIDGET", "createSprite(sprite_128) failed for forecast icon! Heap largest free block: %u", heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
+    }
+    else
+    {
+      WeatherInfo wi = getWeatherInfo(weather_code);
+      String strname = wi.iconName;
+      strname = "/icons/" + String(ICON_WH) + "/" + strname;
+      if (draw_png_2_sprite(strname, sprite_128))
+        sprite_128.pushSprite(&widget_bg_for_sprite, 0, 0, TFT_BLACK);
+      sprite_128.deleteSprite();
+    }
+
+    // Create temperature sprite with heap check
+    if (!temp_for_sprite.createSprite(TEMP_FOR_SPRITE_W, TEMP_FOR_SPRITE_H))
+    {
+      ESP_LOGE("WIDGET", "createSprite(temp_for_sprite) failed! Heap largest free block: %u", heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
+    }
+    else
+    {
+      temp_for_sprite.fillSprite(TFT_TRANSPARENT);
+      // Acquire mutex before loading font
+      if (xSemaphoreTake(xLittleFSMutex, pdMS_TO_TICKS(1000)) != pdTRUE)
+      {
+        ESP_LOGE("WIDGET", "Failed to acquire LittleFS mutex for temp font in forecast");
+        temp_for_sprite.deleteSprite();
+      }
+      else
+      {
+        temp_for_sprite.loadFont(LittleFS, "/arial_cyr32.vlw");
+        temp_for_sprite.setTextDatum(BC_DATUM);
+        temp_for_sprite.setTextColor(getTempColor(max_temp), TFT_TRANSPARENT);
+        temp_for_sprite.drawString(String(static_cast<int8_t>(round(max_temp))) + "°",
+                                   TEMP_FOR_SPRITE_W / 2, TEMP_FOR_SPRITE_H / 2);
+        temp_for_sprite.setTextDatum(TC_DATUM);
+        temp_for_sprite.setTextColor(getTempColor(min_temp), TFT_TRANSPARENT);
+        temp_for_sprite.drawString(String(static_cast<int8_t>(round(min_temp))) + "°",
+                                   TEMP_FOR_SPRITE_W / 2, TEMP_FOR_SPRITE_H / 2 - 8);
+        temp_for_sprite.unloadFont();
+        xSemaphoreGive(xLittleFSMutex); // Release mutex after font operations
+        temp_for_sprite.pushSprite(&widget_bg_for_sprite, WIDGET_FOR_W - TEMP_FOR_SPRITE_W, 4, TFT_TRANSPARENT);
+        temp_for_sprite.deleteSprite();
+      }
+    }
+
+    // Create day sprite with heap check
+    if (!day_for_sprite.createSprite(DAY_FOR_SPRITE_W, DAY_FOR_SPRITE_H))
+    {
+      ESP_LOGE("WIDGET", "createSprite(day_for_sprite) failed! Heap largest free block: %u", heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
+    }
+    else
+    {
+      day_for_sprite.setTextColor(TFT_WHITE, TFT_TRANSPARENT);
+      day_for_sprite.fillSprite(TFT_TRANSPARENT);
+      // Acquire mutex before loading font
+      if (xSemaphoreTake(xLittleFSMutex, pdMS_TO_TICKS(1000)) != pdTRUE)
+      {
+        ESP_LOGE("WIDGET", "Failed to acquire LittleFS mutex for day font in forecast");
+        day_for_sprite.deleteSprite();
+      }
+      else
+      {
+        day_for_sprite.loadFont(LittleFS, "/arial_cyr18.vlw");
+        day_for_sprite.setTextDatum(MC_DATUM);
+        day_for_sprite.drawString(data, DAY_FOR_SPRITE_W / 2, DAY_FOR_SPRITE_H / 2);
+        day_for_sprite.unloadFont();
+        xSemaphoreGive(xLittleFSMutex); // Release mutex after font operations
+        day_for_sprite.pushSprite(&widget_bg_for_sprite, 0, 0, TFT_TRANSPARENT);
+        day_for_sprite.deleteSprite();
+      }
+    }
+
+    // Create precipitation sprite with heap check
+    if (!precip_for_sprite.createSprite(PRECIP_FOR_SPRITE_W, PRECIP_FOR_SPRITE_H))
+    {
+      ESP_LOGE("WIDGET", "createSprite(precip_for_sprite) failed! Heap largest free block: %u", heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
+    }
+    else
+    {
+      precip_for_sprite.setTextColor(TFT_WHITE, TFT_TRANSPARENT);
+      precip_for_sprite.fillSprite(TFT_TRANSPARENT);
+      if (precip_sum > 0)
+      {
+        // Acquire mutex before loading font
+        if (xSemaphoreTake(xLittleFSMutex, pdMS_TO_TICKS(1000)) != pdTRUE)
+        {
+          ESP_LOGE("WIDGET", "Failed to acquire LittleFS mutex for precip font in forecast");
+        }
+        else
+        {
+          precip_for_sprite.loadFont(LittleFS, "/arial_cyr18.vlw");
+          precip_for_sprite.setTextDatum(MR_DATUM);
+          precip_for_sprite.drawString(String(precip_sum) + " мм.", PRECIP_FOR_SPRITE_W / 2, PRECIP_FOR_SPRITE_H / 2);
+          precip_for_sprite.unloadFont();
+          xSemaphoreGive(xLittleFSMutex); // Release mutex after font operations
+        }
+      }
+      precip_for_sprite.pushSprite(&widget_bg_for_sprite, 0, WIDGET_FOR_H - PRECIP_FOR_SPRITE_H, TFT_TRANSPARENT);
+      precip_for_sprite.deleteSprite();
+    }
 
     draw_geomagnetic_widget(static_cast<int>(kp_max), widget_bg_for_sprite, 5, DAY_FOR_SPRITE_H + 5);
   }
