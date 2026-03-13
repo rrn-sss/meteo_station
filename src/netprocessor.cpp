@@ -1,4 +1,5 @@
 #include "netprocessor.h"
+#include "certs.h"
 #include "http_helpers.h"
 #include <WiFi.h>
 #include <esp_log.h>
@@ -33,27 +34,27 @@ bool NetProcessor::sendNarodMon(const OutSensorData_t &data)
     ESP_LOGW("NETWORKING", "Cannot send to NarodMon: failed to get config");
     return false;
   }
-  // Build NarodMon GET URL and use OpenMeteo helper to perform HTTP GET
+
   String mac = WiFi.macAddress();
   mac.toUpperCase();
 
-  String serverPath = "http://narodmon.ru/get?ID=" + mac;
+  // Изменяем с HTTP на HTTPS
+  String serverPath = "https://narodmon.ru/get?ID=" + mac;
   serverPath += "&T1=" + String(data.temperature, 2);
   serverPath += "&H1=" + String(data.humidity, 2);
 
-  ESP_LOGI("NETWORKING", "NarodMon GET URL: %s", serverPath.c_str());
+  ESP_LOGI("NETWORKING", "NarodMon HTTPS URL: %s", serverPath.c_str());
 
-  String resp = send_HTTP_GET_request(serverPath.c_str());
-  // String resp = "{}"; // AFDPO
-  // ESP_LOGI("NETWORKING", "Sending NarodMon HTTP GET request... %s", serverPath.c_str()); // AFDPO
+  // Используем HTTPS функцию с сертификатом
+  String resp = send_HTTPS_GET_request(serverPath.c_str(), CERT_ISRG_ROOT_X1, "MeteoStation/1.0");
 
   if (resp.equals("{}") || resp.length() == 0)
   {
-    ESP_LOGW("NETWORKING", "NarodMon send returned empty or error response");
+    ESP_LOGW("NETWORKING", "NarodMon HTTPS send returned empty or error response");
     return false;
   }
 
-  ESP_LOGI("NETWORKING", "NarodMon response: %s", resp.c_str());
+  ESP_LOGI("NETWORKING", "NarodMon HTTPS response: %s", resp.c_str());
   return true;
 }
 

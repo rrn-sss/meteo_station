@@ -926,9 +926,9 @@ bool MeteoWidgets::draw_battery_level_widget(uint8_t level)
     icon = BATTERY_0_PNG_NAME;
   else if (level <= 35)
     icon = BATTERY_25_PNG_NAME;
-  else if (level <= 65)
+  else if (level <= 60)
     icon = BATTERY_50_PNG_NAME;
-  else if (level <= 90)
+  else if (level <= 85)
     icon = BATTERY_75_PNG_NAME;
   else
     icon = BATTERY_100_PNG_NAME;
