@@ -7,6 +7,7 @@
  */
 
 #include "nvscfg.h"
+#include "tasks_common.h"
 #include <ArduinoJson.h>
 #include <FS.h>
 #include <LittleFS.h>
@@ -114,9 +115,18 @@ bool NvsCfg::migrate(bool delete_old_file)
     prefs.end();
   }
 
+  // Acquire LittleFS mutex to protect from concurrent access with TFT task
+  if (xLittleFSMutex && xSemaphoreTake(xLittleFSMutex, pdMS_TO_TICKS(1000)) != pdTRUE)
+  {
+    ESP_LOGE(TAG, "Failed to acquire LittleFS mutex for migration");
+    return false;
+  }
+
   // Try to read from LittleFS config.json
   if (!LittleFS.exists("/config.json"))
   {
+    if (xLittleFSMutex)
+      xSemaphoreGive(xLittleFSMutex);
     ESP_LOGI(TAG, "No LittleFS config.json found — using defaults");
     return true; // Not an error, just no migration needed
   }
@@ -126,6 +136,8 @@ bool NvsCfg::migrate(bool delete_old_file)
   File configFile = LittleFS.open("/config.json", "r");
   if (!configFile)
   {
+    if (xLittleFSMutex)
+      xSemaphoreGive(xLittleFSMutex);
     ESP_LOGE(TAG, "Failed to open config.json for migration");
     return false;
   }
@@ -139,6 +151,8 @@ bool NvsCfg::migrate(bool delete_old_file)
   const auto err = deserializeJson(json, buf.get());
   if (err)
   {
+    if (xLittleFSMutex)
+      xSemaphoreGive(xLittleFSMutex);
     ESP_LOGE(TAG, "Failed to parse JSON config during migration: %s", err.c_str());
     return false;
   }
@@ -158,6 +172,8 @@ bool NvsCfg::migrate(bool delete_old_file)
 
   if (!save(cfg))
   {
+    if (xLittleFSMutex)
+      xSemaphoreGive(xLittleFSMutex);
     ESP_LOGE(TAG, "Failed to save migrated config to NVS");
     return false;
   }
@@ -176,6 +192,10 @@ bool NvsCfg::migrate(bool delete_old_file)
       ESP_LOGW(TAG, "Failed to remove old config.json");
     }
   }
+
+  // Release LittleFS mutex
+  if (xLittleFSMutex)
+    xSemaphoreGive(xLittleFSMutex);
 
   return true;
 }
