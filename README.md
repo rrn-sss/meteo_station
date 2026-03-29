@@ -9,10 +9,33 @@ ESP32-S3 Weather Station with TFT Display
 ## Аппаратные требования
 
 - **Плата**: ESP32-S3-DevKitC-1 (16MB Flash, 8MB PSRAM)
-- **Дисплей**: TFT ILI9488 480x320 (SPI)
+- **Дисплей**: TFT ILI9488 480x320 (SPI) 4"
 - **Внутренний датчик**: BME280 (I2C: 0x76/0x77)
 - **Внешний приёмник**: nRF24L01+ (SPI)
 - **Файловая система**: LittleFS
+
+## Аппаратные компоненты
+
+### Фотографии компонентов
+
+**ESP32-S3-DevKitC-1**
+![ESP32-S3-DevKitC-1](etc/images/esp32-s3-n16r8-devkit.png)
+
+**TFT ILI9488 480x320 4"**
+![TFT ILI9488](etc/images/tft-ili9488.jpg)
+
+**Датчик BME280**
+![BME280](etc/images/bme280.jpg)
+
+**Модуль nRF24L01+**
+![nRF24L01+](etc/images/nrf24l01.jpg)
+
+### Схема подключения
+
+Схема подключения компонентов доступна в следующих файлах:
+
+- **Fritzing схема**: упрощенная схема [etc/fritzing_scheme.fzz](etc/fritzing_scheme.fzz)
+- **EasyEDA проект**: [etc/meteo_station_main.eprj](etc/meteo_station_main.eprj)
 
 ## Функциональные возможности
 
