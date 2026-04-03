@@ -165,16 +165,16 @@ static const int HOME_SENSOR_AVG_SAMPLES = 5;
 /// @brief структура данных конфигурации проекта (конфигурируется через веб-портал)
 struct PrjCfgData
 {
-  char mqtt_server[32] = {"tag78.ru"};                       // сервер mqtt брокера
-  char mqtt_port[5] = {"1883"};                              // сервер mqtt брокера
-  char mqtt_user[32] = {"xxxxxx"};                           // логин на mqtt сервере srv2.clusterfly.ru
-  char mqtt_pass[32] = {"yyyyyy"};                           // пароль на mqtt сервере srv2.clusterfly.ru
-  char mqtt_prefix[32] = {"meteo_station"};                  // префикс топиков (например "waterleaker_sensor")
-  char bot_token[64] = {"XXXXXXXXXX:YYYYYYYYYYYYYYYYYYYYY"}; // токен телеграмм бота
-  char bot_chat_id[16] = {"-ZZZZZZZZZZZZZ"};                 // идентификатор чата телеграмм бота
-  char latitude[8] = {"47.2362"};                            // широта для open-meteo
-  char longitude[8] = {"38.8969"};                           // долгота для open-meteo
-  char gmt_offset_sec[6] = {"10800"};                        // смещение часового пояса в секундах (Москва +3 часа = 10800 секунд)
+  char mqtt_server[32] = {"srv2.clusterfly.ru"}; // сервер mqtt брокера
+  char mqtt_port[5] = {"9993"};                  // сервер mqtt брокера
+  char mqtt_user[32] = {""};                     // логин на mqtt сервере srv2.clusterfly.ru
+  char mqtt_pass[32] = {""};                     // пароль на mqtt сервере srv2.clusterfly.ru
+  char mqtt_prefix[32] = {"meteo_station"};      // префикс топиков (например "waterleaker_sensor")
+  // char bot_token[64] = {"XXXXXXXXXX:YYYYYYYYYYYYYYYYYYYYY"}; // токен телеграмм бота
+  // char bot_chat_id[16] = {"-ZZZZZZZZZZZZZ"};                 // идентификатор чата телеграмм бота
+  char latitude[8] = {"47.2362"};     // широта для open-meteo
+  char longitude[8] = {"38.8969"};    // долгота для open-meteo
+  char gmt_offset_sec[6] = {"10800"}; // смещение часового пояса в секундах (Москва +3 часа = 10800 секунд)
 };
 
 /// @brief структура данных внутреннего датчика метеостанции

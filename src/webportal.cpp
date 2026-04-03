@@ -236,8 +236,8 @@ WebConfig::WebConfig(WiFiManager &wm_ref)
       custom_mqtt_user("user", "MQTT login"),
       custom_mqtt_pass("pass", "MQTT password"),
       custom_mqtt_prefix("prefix", "MQTT topics prefix"),
-      custom_bot_token("bot_token", "Telegram bot token"),
-      custom_bot_chat_id("bot_chat_id", "Telegram bot chat ID"),
+      //custom_bot_token("bot_token", "Telegram bot token"),
+      //custom_bot_chat_id("bot_chat_id", "Telegram bot chat ID"),
       custom_lat("latitude", "Latitude for Open-Meteo (e.g. \"47.2329\")"),
       custom_long("longitude", "Longitude for Open-Meteo (e.g. \"39.7075\")"),
       custom_gmt_offset("gmt_offset_sec", "GMT offset seconds (e.g. \"10800\")")
@@ -247,8 +247,8 @@ WebConfig::WebConfig(WiFiManager &wm_ref)
   wm.addParameter(&custom_mqtt_user);
   wm.addParameter(&custom_mqtt_pass);
   wm.addParameter(&custom_mqtt_prefix);
-  wm.addParameter(&custom_bot_token);
-  wm.addParameter(&custom_bot_chat_id);
+  //wm.addParameter(&custom_bot_token);
+  //wm.addParameter(&custom_bot_chat_id);
   wm.addParameter(&custom_lat);
   wm.addParameter(&custom_long);
   wm.addParameter(&custom_gmt_offset);
@@ -287,8 +287,8 @@ void WebConfig::process_autoconnect_or_config(bool f_on_demand)
     ESP_LOGI(TAG, "  mqtt_user      : %s", cfg.mqtt_user);
     ESP_LOGI(TAG, "  mqtt_pass      : %s", cfg.mqtt_pass);
     ESP_LOGI(TAG, "  mqtt_prefix    : %s", cfg.mqtt_prefix);
-    ESP_LOGI(TAG, "  bot_token      : %s", cfg.bot_token);
-    ESP_LOGI(TAG, "  bot_chat_id    : %s", cfg.bot_chat_id);
+    //ESP_LOGI(TAG, "  bot_token      : %s", cfg.bot_token);
+    //ESP_LOGI(TAG, "  bot_chat_id    : %s", cfg.bot_chat_id);
     ESP_LOGI(TAG, "  latitude       : %s", cfg.latitude);
     ESP_LOGI(TAG, "  longitude      : %s", cfg.longitude);
     ESP_LOGI(TAG, "  gmt_offset_sec : %s", cfg.gmt_offset_sec);
@@ -300,8 +300,8 @@ void WebConfig::process_autoconnect_or_config(bool f_on_demand)
   custom_mqtt_user.setValue(cfg.mqtt_user, sizeof(cfg.mqtt_user));
   custom_mqtt_pass.setValue(cfg.mqtt_pass, sizeof(cfg.mqtt_pass));
   custom_mqtt_prefix.setValue(cfg.mqtt_prefix, sizeof(cfg.mqtt_prefix));
-  custom_bot_token.setValue(cfg.bot_token, sizeof(cfg.bot_token));
-  custom_bot_chat_id.setValue(cfg.bot_chat_id, sizeof(cfg.bot_chat_id));
+  //custom_bot_token.setValue(cfg.bot_token, sizeof(cfg.bot_token));
+  //custom_bot_chat_id.setValue(cfg.bot_chat_id, sizeof(cfg.bot_chat_id));
   custom_lat.setValue(cfg.latitude, sizeof(cfg.latitude));
   custom_long.setValue(cfg.longitude, sizeof(cfg.longitude));
   custom_gmt_offset.setValue(cfg.gmt_offset_sec, sizeof(cfg.gmt_offset_sec));
@@ -347,8 +347,8 @@ void WebConfig::process_autoconnect_or_config(bool f_on_demand)
   strncpy(cfg.mqtt_user, custom_mqtt_user.getValue(), sizeof(cfg.mqtt_user) - 1);
   strncpy(cfg.mqtt_pass, custom_mqtt_pass.getValue(), sizeof(cfg.mqtt_pass) - 1);
   strncpy(cfg.mqtt_prefix, custom_mqtt_prefix.getValue(), sizeof(cfg.mqtt_prefix) - 1);
-  strncpy(cfg.bot_token, custom_bot_token.getValue(), sizeof(cfg.bot_token) - 1);
-  strncpy(cfg.bot_chat_id, custom_bot_chat_id.getValue(), sizeof(cfg.bot_chat_id) - 1);
+  //strncpy(cfg.bot_token, custom_bot_token.getValue(), sizeof(cfg.bot_token) - 1);
+  //strncpy(cfg.bot_chat_id, custom_bot_chat_id.getValue(), sizeof(cfg.bot_chat_id) - 1);
   strncpy(cfg.latitude, custom_lat.getValue(), sizeof(cfg.latitude) - 1);
   strncpy(cfg.longitude, custom_long.getValue(), sizeof(cfg.longitude) - 1);
   strncpy(cfg.gmt_offset_sec, custom_gmt_offset.getValue(), sizeof(cfg.gmt_offset_sec) - 1);

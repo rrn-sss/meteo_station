@@ -26,8 +26,8 @@ private:
   WiFiManagerParameter custom_mqtt_user;
   WiFiManagerParameter custom_mqtt_pass;
   WiFiManagerParameter custom_mqtt_prefix;
-  WiFiManagerParameter custom_bot_token;
-  WiFiManagerParameter custom_bot_chat_id;
+  //WiFiManagerParameter custom_bot_token; 
+  //WiFiManagerParameter custom_bot_chat_id;
   WiFiManagerParameter custom_lat;
   WiFiManagerParameter custom_long;
   WiFiManagerParameter custom_gmt_offset;

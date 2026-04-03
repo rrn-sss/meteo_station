@@ -62,8 +62,8 @@ bool NvsCfg::load(PrjCfgData &cfg)
   readStr(kKeyMqttUser, cfg.mqtt_user, sizeof(cfg.mqtt_user));
   readStr(kKeyMqttPass, cfg.mqtt_pass, sizeof(cfg.mqtt_pass));
   readStr(kKeyMqttPrefix, cfg.mqtt_prefix, sizeof(cfg.mqtt_prefix));
-  readStr(kKeyBotToken, cfg.bot_token, sizeof(cfg.bot_token));
-  readStr(kKeyBotChatId, cfg.bot_chat_id, sizeof(cfg.bot_chat_id));
+  //readStr(kKeyBotToken, cfg.bot_token, sizeof(cfg.bot_token));
+  //readStr(kKeyBotChatId, cfg.bot_chat_id, sizeof(cfg.bot_chat_id));
   readStr(kKeyLatitude, cfg.latitude, sizeof(cfg.latitude));
   readStr(kKeyLongitude, cfg.longitude, sizeof(cfg.longitude));
   readStr(kKeyGmtOffset, cfg.gmt_offset_sec, sizeof(cfg.gmt_offset_sec));
@@ -88,8 +88,8 @@ bool NvsCfg::save(const PrjCfgData &cfg)
   prefs.putString(kKeyMqttUser, cfg.mqtt_user);
   prefs.putString(kKeyMqttPass, cfg.mqtt_pass);
   prefs.putString(kKeyMqttPrefix, cfg.mqtt_prefix);
-  prefs.putString(kKeyBotToken, cfg.bot_token);
-  prefs.putString(kKeyBotChatId, cfg.bot_chat_id);
+  //prefs.putString(kKeyBotToken, cfg.bot_token);
+  //prefs.putString(kKeyBotChatId, cfg.bot_chat_id);
   prefs.putString(kKeyLatitude, cfg.latitude);
   prefs.putString(kKeyLongitude, cfg.longitude);
   prefs.putString(kKeyGmtOffset, cfg.gmt_offset_sec);
@@ -164,8 +164,8 @@ bool NvsCfg::migrate(bool delete_old_file)
   strncpy(cfg.mqtt_user, json["mqtt_user"] | "", sizeof(cfg.mqtt_user) - 1);
   strncpy(cfg.mqtt_pass, json["mqtt_pass"] | "", sizeof(cfg.mqtt_pass) - 1);
   strncpy(cfg.mqtt_prefix, json["mqtt_prefix"] | "", sizeof(cfg.mqtt_prefix) - 1);
-  strncpy(cfg.bot_token, json["bot_token"] | "", sizeof(cfg.bot_token) - 1);
-  strncpy(cfg.bot_chat_id, json["bot_chat_id"] | "", sizeof(cfg.bot_chat_id) - 1);
+  //strncpy(cfg.bot_token, json["bot_token"] | "", sizeof(cfg.bot_token) - 1);
+  //strncpy(cfg.bot_chat_id, json["bot_chat_id"] | "", sizeof(cfg.bot_chat_id) - 1);
   strncpy(cfg.latitude, json["latitude"] | "", sizeof(cfg.latitude) - 1);
   strncpy(cfg.longitude, json["longitude"] | "", sizeof(cfg.longitude) - 1);
   strncpy(cfg.gmt_offset_sec, json["gmt_offset_sec"] | "", sizeof(cfg.gmt_offset_sec) - 1);
