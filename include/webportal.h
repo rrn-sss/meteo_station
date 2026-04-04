@@ -20,14 +20,14 @@ private:
   void apply_custom_ui();
 
   WiFiManager &wm;
-  int timeout = 120; // время выполнения в секундах
+  int timeout = 600; // время выполнения в секундах
   WiFiManagerParameter custom_mqtt_server;
   WiFiManagerParameter custom_mqtt_port;
   WiFiManagerParameter custom_mqtt_user;
   WiFiManagerParameter custom_mqtt_pass;
   WiFiManagerParameter custom_mqtt_prefix;
-  //WiFiManagerParameter custom_bot_token; 
-  //WiFiManagerParameter custom_bot_chat_id;
+  // WiFiManagerParameter custom_bot_token; // (не используется, но оставлено для удобства будущих расширений)
+  // WiFiManagerParameter custom_bot_chat_id; // (не используется, но оставлено для удобства будущих расширений)
   WiFiManagerParameter custom_lat;
   WiFiManagerParameter custom_long;
   WiFiManagerParameter custom_gmt_offset;

@@ -46,7 +46,8 @@ bool MqttSender::connect(const PrjCfgData &cfg)
   }
   else
   {
-    ESP_LOGW(TAG, "MQTT connect failed: rc=%d", mqttClient.state());
+    ESP_LOGW(TAG, "MQTT connect failed: rc=%d (srv: %s, user: %s, pass: %s)",
+             mqttClient.state(), cfg.mqtt_server, cfg.mqtt_user, cfg.mqtt_pass);
     return false;
   }
 }
@@ -98,7 +99,7 @@ void MqttSender::processing(const PrjCfgData &cfg, QueDataItem_t &qitem)
       {
         char topic[64];
         char payload[128];
-        snprintf(topic, sizeof(topic), "%s/in", cfg.mqtt_prefix);
+        snprintf(topic, sizeof(topic), "%s/%s/in", cfg.mqtt_user, cfg.mqtt_prefix);
         snprintf(payload, sizeof(payload), "{\"t\":%.1f,\"p\":%.0f,\"h\":%u}",
                  p->temperature_in, p->pressure_in, p->humidity_in);
         if (!publish(topic, payload))
@@ -116,7 +117,7 @@ void MqttSender::processing(const PrjCfgData &cfg, QueDataItem_t &qitem)
       {
         char topic[64];
         char payload[128];
-        snprintf(topic, sizeof(topic), "%s/out", cfg.mqtt_prefix);
+        snprintf(topic, sizeof(topic), "%s/%s/out", cfg.mqtt_user, cfg.mqtt_prefix);
         snprintf(payload, sizeof(payload), "{\"t\":%.1f,\"p\":%u,\"h\":%.0f,\"bat\":%u}",
                  p->temperature, p->pressure, p->humidity, p->bat_charge);
         if (!publish(topic, payload))
