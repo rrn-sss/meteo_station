@@ -335,7 +335,7 @@ void WebConfig::process_autoconnect_or_config(bool f_on_demand)
   {
     ESP_LOGI(TAG, "Starting config portal...");
     apply_custom_ui();
-    wm.setSaveConfigCallback(saveConfigCallback);
+    wm.setSaveParamsCallback(saveConfigCallback);
     wm.setConfigPortalTimeout(PORTAL_TIMEOUT_SEC);
     wm.setDebugOutput(false);
     wm.startConfigPortal("MeteoStation-AP");
