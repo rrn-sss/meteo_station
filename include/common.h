@@ -166,7 +166,7 @@ static const int HOME_SENSOR_AVG_SAMPLES = 5;
 struct PrjCfgData
 {
   char mqtt_server[32] = {"srv2.clusterfly.ru"}; // сервер mqtt брокера
-  char mqtt_port[5] = {"9993"};                  // сервер mqtt брокера
+  char mqtt_port[5] = {"9991"};                  // сервер mqtt брокера
   char mqtt_user[32] = {""};                     // логин на mqtt сервере srv2.clusterfly.ru
   char mqtt_pass[32] = {""};                     // пароль на mqtt сервере srv2.clusterfly.ru
   char mqtt_prefix[32] = {"meteo_station"};      // префикс топиков (например "waterleaker_sensor")

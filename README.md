@@ -16,7 +16,11 @@ ESP32-S3 Weather Station with TFT Display
 
 ## Аппаратные компоненты
 
-### Фотографии компонентов
+### Фотография метеостанции в сборе
+
+![Метеостанция в сборе](etc/images/main.jpg)
+
+### Фотографии отдельных компонентов
 
 **ESP32-S3-DevKitC-1**
 ![ESP32-S3-DevKitC-1](etc/images/esp32-s3-n16r8-devkit.png)
@@ -65,76 +69,50 @@ ESP32-S3 Weather Station with TFT Display
 - **Внутренний**: BME280 (температура, влажность, давление)
 - **Внешний**: ESP32-C6 + SHTC3 + nRF24L01+ (требуется отдельный проект `meteo_station_out_sensor`)
 
-## Архитектура системы
-
-```mermaid
-graph TB
-    subgraph ESP32-S3
-        TFT[TFT Display<br/>ILI9488 480x320]
-        BME[BME280<br/>I2C]
-        NRF[nRF24L01+<br/>SPI]
-        
-        TaskTFT[TFT Task]
-        TaskNet[Networking Task]
-        TaskHome[Home Sensor Task]
-        TaskNRF[nRF24 Task]
-        TaskOTA[OTA Task]
-        
-        TaskTFT --> TFT
-        TaskHome --> BME
-        TaskNRF --> NRF
-    end
-    
-    subgraph Cloud
-        OpenMeteo[Open-Meteo API]
-        MQTT[MQTT Broker]
-        NarodMon[NarodMon]
-        Nominatim[Nominatim<br/>Geocoding]
-        NTP[NTP Server]
-    end
-    
-    TaskNet --> OpenMeteo
-    TaskNet --> MQTT
-    TaskNet --> NarodMon
-    TaskNet --> Nominatim
-    TaskNet --> NTP
-    
-    subgraph External Sensor
-        ExtSensor[External Sensor<br/>ESP8266 + BME280]
-        NRFExt[nRF24L01+]
-    end
-    
-    NRFExt --> NRF
-    ExtSensor --> NRFExt
-```
-
 ## Конфигурация
 
 ### Параметры веб-портала
 
 | Параметр | Описание | По умолчанию |
 |----------|----------|--------------|
-| MQTT Server | Адрес MQTT брокера | tag78.ru |
-| MQTT Port | Порт MQTT брокера | 1883 |
+| MQTT Server | Адрес MQTT брокера | srv2.clusterfly.ru |
+| MQTT Port | Порт MQTT брокера | 9991 |
 | MQTT User | Имя пользователя MQTT | - |
 | MQTT Pass | Пароль MQTT | - |
 | MQTT Prefix | Префикс топиков | meteo_station |
-| Bot Token | Токен Telegram бота | - |
-| Bot Chat ID | ID чата Telegram | - |
-| Latitude | Широта для Open-Meteo | 47.2362 |
-| Longitude | Долгота для Open-Meteo | 38.8969 |
+| Latitude | Широта для Open-Meteo | 55.7522 |
+| Longitude | Долгота для Open-Meteo | 37.6155 |
 | GMT Offset | Смещение часового пояса (сек) | 10800 |
 
 ### Вывод MQTT топиков
 
+Топики формируются по шаблону: `{mqtt_user}/{mqtt_prefix}/<тип_датчика>`
+
+**Внутренний датчик (BME280):**
 ```
-{mqtt_prefix}/in/temperature   - температура внутри (°C)
-{mqtt_prefix}/in/humidity      - влажность внутри (%)
-{mqtt_prefix}/in/pressure      - давление внутри (hPa)
-{mqtt_prefix}/out/temperature  - температура снаружи (°C)
-{mqtt_prefix}/out/humidity     - влажность снаружи (%)
-{mqtt_prefix}/out/pressure     - давление снаружи (hPa)
-{mqtt_prefix}/out/battery      - заряд батареи (%)
+{mqtt_user}/{mqtt_prefix}/in
+```
+JSON payload:
+```json
+{
+  "t": 22.5,   // температура внутри (°C)
+  "p": 1013,   // давление внутри (hPa)
+  "h": 45      // влажность внутри (%)
+}
+```
+
+**Внешний датчик (nRF24L01+):**
+```
+{mqtt_user}/{mqtt_prefix}/out
+```
+JSON payload:
+```json
+{
+  "t": -5.2,   // температура снаружи (°C)
+  "p": 1015,   // давление снаружи (hPa)
+  "h": 65,     // влажность снаружи (%)
+  "bat": 87    // заряд батареи (%)
+}
 ```
 
 ## Сборка и прошивка
