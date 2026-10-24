@@ -162,6 +162,19 @@ void task_tft_exec(void *pvParameters)
         OpenMeteoData *pdata = static_cast<OpenMeteoData *>(qitem.data);
         if (pdata && pdata->index >= 0 && pdata->index < _METEO_DATA_NUM_)
         {
+          // Защита: полностью занулённая запись прогноза не должна затирать последние корректные данные
+          const bool zeroedForecast = (pdata->index != METEO_DATA_CURRENT) && (pdata->date[0] == '\0') &&
+                                      (pdata->weather_code == 0) && (pdata->temperature == 0.0f) &&
+                                      (pdata->temperature_max == 0.0f) && (pdata->temperature_min == 0.0f) &&
+                                      (pdata->wind_speed == 0.0f) && (pdata->wind_direction == 0) &&
+                                      (pdata->precipitation == 0.0f);
+          if (zeroedForecast)
+          {
+            ESP_LOGW("TFT", "Ignoring zeroed forecast record METEO[%d]", static_cast<int>(pdata->index));
+            delete pdata;
+            continue;
+          }
+
           ESP_LOGI("TFT", "Got data METEO[%u] from queue", pdata->index);
           // Сохранить данные в локальный буфер
           latestMeteo[pdata->index] = *pdata;

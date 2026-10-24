@@ -138,16 +138,22 @@ void task_networking_exec(void *pvParameters)
 
     if ((xTaskGetTickCount() - xLastMeteoTime) >= pdMS_TO_TICKS(METEO_POLL_INTERVAL_MS) || dateChanged)
     {
+      bool meteoOk = false;
       if (WiFi.status() == WL_CONNECTED)
       {
         bool GeoMagOk = openMeteo->process_geomagnetic_data(); // должен быть вызван до обработки метео-данных
-        bool meteoOk = openMeteo->process_meteo_data();
+        meteoOk = openMeteo->process_meteo_data();
         if (meteoOk)
           xEventGroupSetBits(xEventGroup, BIT_OPEN_METEO_UP);
         else
           xEventGroupClearBits(xEventGroup, BIT_OPEN_METEO_UP);
       }
-      xLastMeteoTime = xTaskGetTickCount();
+
+      if (meteoOk)
+        xLastMeteoTime = xTaskGetTickCount();
+      else
+        // после неудачи повторить запрос через METEO_RETRY_INTERVAL_MS, а не через полный интервал
+        xLastMeteoTime = xTaskGetTickCount() - pdMS_TO_TICKS(METEO_POLL_INTERVAL_MS - METEO_RETRY_INTERVAL_MS);
     }
 
     // Periodic NarodMon sender (every NARODMON_INTERVAL_MS)

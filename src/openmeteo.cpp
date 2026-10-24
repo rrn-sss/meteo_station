@@ -24,10 +24,49 @@ OpenMeteo::~OpenMeteo()
   // nothing special to cleanup
 }
 
+// Проверка целостности ответа Open-Meteo: JSON с ошибкой API, отсутствующими
+// объектами или null-полями не должен интерпретироваться как нулевые данные
+static bool is_meteo_response_valid(JsonDocument &json)
+{
+  if (json["error"].is<bool>())
+    return false;
+
+  if (!json["current"].is<JsonObject>() || !json["daily"].is<JsonObject>())
+    return false;
+
+  constexpr size_t kDaysRequired = static_cast<size_t>(_METEO_DATA_NUM_ - 1);
+
+  JsonArray dailyTime = json["daily"]["time"].as<JsonArray>();
+  if (dailyTime.size() < kDaysRequired)
+    return false;
+
+  for (size_t i = 0; i < kDaysRequired; ++i)
+    if (dailyTime[i].isNull())
+      return false;
+
+  if (json["current"]["weather_code"].isNull() || json["current"]["temperature_2m"].isNull())
+    return false;
+
+  static const char *dailyKeys[] = {"temperature_2m_max", "temperature_2m_min", "precipitation_sum",
+                                    "wind_speed_10m_max", "wind_direction_10m_dominant", "weather_code"};
+  for (const char *key : dailyKeys)
+  {
+    JsonArray arr = json["daily"][key].as<JsonArray>();
+    if (arr.size() < kDaysRequired)
+      return false;
+    for (size_t i = 0; i < kDaysRequired; ++i)
+      if (arr[i].isNull())
+        return false;
+  }
+
+  return true;
+}
+
 bool OpenMeteo::process_meteo_data()
 {
   bool ret = false;
   bool http_error = false;
+  bool response_valid = false;
   size_t sent_cnt = 0; // счетчик успешно отправленных записей
   JsonDocument json;
   auto deserializeError = deserializeJson(json, "{}"); // инициализация пустым JSON
@@ -44,9 +83,12 @@ bool OpenMeteo::process_meteo_data()
 #endif
     http_error = weather_str.equals("{}");
     deserializeError = deserializeJson(json, weather_str);
+    response_valid = !deserializeError && !http_error && is_meteo_response_valid(json);
+    if (!deserializeError && !http_error && !response_valid)
+      ESP_LOGE(TAG, "OpenMeteo response rejected (error/incomplete JSON): %.200s", weather_str.c_str());
   }
 
-  if (!deserializeError && !http_error)
+  if (response_valid)
   {
     // Use a function-local static buffer to avoid heap fragmentation
     static OpenMeteoData tmp_buf[_METEO_DATA_NUM_];
@@ -153,7 +195,7 @@ bool OpenMeteo::process_meteo_data()
   {
     if (http_error)
       ESP_LOGE(TAG, "HTTP error when getting OpenMeteo data");
-    else
+    else if (deserializeError)
       ESP_LOGE(TAG, "Failed to parse OpenMeteo JSON response: %s", deserializeError.c_str());
   }
 

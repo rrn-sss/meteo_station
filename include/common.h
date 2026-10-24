@@ -126,6 +126,7 @@ public:
 #define PROTASK_OTA_STACK_SIZE 10240           // размер стека задачи OTA (увеличен для HTTPS)
 
 #define METEO_POLL_INTERVAL_MS (60000 * 10)                      // интервал опроса метео-данных (10 минут)
+#define METEO_RETRY_INTERVAL_MS (60000)                          // интервал повторного опроса после неудачи (1 минута)
 #define MAX_METEO_VALID_INTERVAL_MS (METEO_POLL_INTERVAL_MS * 3) // максимальный интервал валидности метео-данных (30 минут)
 
 /// @brief перечень задач проекта
