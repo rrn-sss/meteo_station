@@ -167,15 +167,15 @@ static const int HOME_SENSOR_AVG_SAMPLES = 5;
 struct PrjCfgData
 {
   char mqtt_server[32] = {"srv2.clusterfly.ru"}; // сервер mqtt брокера
-  char mqtt_port[5] = {"9991"};                  // сервер mqtt брокера
+  char mqtt_port[8] = {"9991"};                  // сервер mqtt брокера
   char mqtt_user[32] = {""};                     // логин на mqtt сервере srv2.clusterfly.ru
   char mqtt_pass[32] = {""};                     // пароль на mqtt сервере srv2.clusterfly.ru
   char mqtt_prefix[32] = {"meteo_station"};      // префикс топиков (например "waterleaker_sensor")
   // char bot_token[64] = {"XXXXXXXXXX:YYYYYYYYYYYYYYYYYYYYY"}; // токен телеграмм бота
   // char bot_chat_id[16] = {"-ZZZZZZZZZZZZZ"};                 // идентификатор чата телеграмм бота
-  char latitude[8] = {"55.7522"};     // широта для open-meteo
-  char longitude[8] = {"37.6155"};    // долгота для open-meteo
-  char gmt_offset_sec[6] = {"10800"}; // смещение часового пояса в секундах (Москва +3 часа = 10800 секунд)
+  char latitude[16] = {"55.7522"};     // широта для open-meteo
+  char longitude[16] = {"37.6155"};    // долгота для open-meteo
+  char gmt_offset_sec[8] = {"10800"};  // смещение часового пояса в секундах (Москва +3 часа = 10800 секунд, может быть отрицательным)
 };
 
 /// @brief структура данных внутреннего датчика метеостанции
