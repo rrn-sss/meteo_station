@@ -1,4 +1,5 @@
 #include "mqttsender.h"
+#include "openmeteo.h"
 #include "tasks_common.h"
 #include <esp_log.h>
 #include <esp_system.h>
@@ -90,12 +91,18 @@ bool MqttSender::publish(const char *topic, const String &payload)
 
 void MqttSender::processing(const PrjCfgData &cfg, QueDataItem_t &qitem)
 {
-  if (mqttClient.connected())
+  // Payload ownership is transferred to this method: it must be freed even if
+  // MQTT is disconnected, otherwise queued sensor data leaks.
+  const bool mqttConnected = mqttClient.connected();
+
+  switch (qitem.type)
   {
-    if (qitem.type == QUE_DATATYPE_IN_SENSOR_DATA)
+  case QUE_DATATYPE_IN_SENSOR_DATA:
+  {
+    HomeSensorData_t *p = static_cast<HomeSensorData_t *>(qitem.data);
+    if (p)
     {
-      HomeSensorData_t *p = static_cast<HomeSensorData_t *>(qitem.data);
-      if (p)
+      if (mqttConnected)
       {
         char topic[64];
         char payload[128];
@@ -106,14 +113,18 @@ void MqttSender::processing(const PrjCfgData &cfg, QueDataItem_t &qitem)
           ESP_LOGW(TAG, "Failed publish to %s", topic);
         else
           ESP_LOGI(TAG, "Published IN -> %s", topic);
-
-        delete p; // free memory after publishing
       }
+      delete p;
     }
-    else if (qitem.type == QUE_DATATYPE_OUT_SENSOR_DATA)
+    break;
+  }
+
+  case QUE_DATATYPE_OUT_SENSOR_DATA:
+  {
+    OutSensorData_t *p = static_cast<OutSensorData_t *>(qitem.data);
+    if (p)
     {
-      OutSensorData_t *p = static_cast<OutSensorData_t *>(qitem.data);
-      if (p)
+      if (mqttConnected)
       {
         char topic[64];
         char payload[128];
@@ -124,16 +135,35 @@ void MqttSender::processing(const PrjCfgData &cfg, QueDataItem_t &qitem)
           ESP_LOGW(TAG, "Failed publish to %s", topic);
         else
           ESP_LOGI(TAG, "Published OUT -> %s", topic);
-
-        delete p; // free memory after publishing
       }
+      delete p;
     }
-    else
-    {
-      ESP_LOGW(TAG, "Unknown QueDataType_t %d in MQTT processing", static_cast<int>(qitem.type));
-      // Unknown data type; just free the data pointer
-      if (qitem.data)
-        delete static_cast<uint8_t *>(qitem.data);
-    }
+    break;
   }
+
+  // Other queue payload types are not published here, but their memory is
+  // still owned by the queue consumer and must be released.
+  case QUE_DATATYPE_CITYNAME:
+    delete static_cast<String *>(qitem.data);
+    break;
+
+  case QUE_DATATYPE_METEO:
+    delete static_cast<OpenMeteoData *>(qitem.data);
+    break;
+
+  case QUE_DATATYPE_GEOMAGNETIC:
+    delete static_cast<GeoMagneticKpMax *>(qitem.data);
+    break;
+
+  case QUE_DATATYPE_CFG:
+    delete static_cast<PrjCfgData *>(qitem.data);
+    break;
+
+  default:
+    ESP_LOGW(TAG, "Unknown QueDataType_t %d in MQTT processing", static_cast<int>(qitem.type));
+    // Unknown payload type: no safe typed delete is possible here.
+    break;
+  }
+
+  qitem.data = nullptr;
 }
