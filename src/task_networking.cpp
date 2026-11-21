@@ -1,4 +1,5 @@
 #include "task_networking.h"
+#include "cfg_validate.h"
 #include "common.h"
 #include "netprocessor.h"
 #include "openmeteo.h"
@@ -45,7 +46,20 @@ void task_networking_exec(void *pvParameters)
   if (1) // для освобождения стека
   {
 
-    openMeteo->set_config(cfg.latitude, cfg.longitude);
+    // Координаты уходят в URL Open-Meteo строкой, поэтому передаём только
+    // нормализованные числа (защита от мусора и лишних параметров в запросе)
+    double cfg_lat = 0.0;
+    double cfg_lon = 0.0;
+    if (CfgValidate::parseDouble(cfg.latitude, -90.0, 90.0, cfg_lat) &&
+        CfgValidate::parseDouble(cfg.longitude, -180.0, 180.0, cfg_lon))
+    {
+      openMeteo->set_config(String(cfg_lat, 6), String(cfg_lon, 6));
+    }
+    else
+    {
+      ESP_LOGW("NETWORKING", "Invalid coordinates in config (lat='%s', lon='%s'), Open-Meteo keeps default location",
+               cfg.latitude, cfg.longitude);
+    }
 
     // Настроить NTP из сохранённой конфигурации (реализовано в NetProcessor)
     if (!net.configureNTPFromConfig())

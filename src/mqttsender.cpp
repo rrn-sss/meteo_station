@@ -1,4 +1,5 @@
 #include "mqttsender.h"
+#include "cfg_validate.h"
 #include "openmeteo.h"
 #include "tasks_common.h"
 #include <esp_log.h>
@@ -36,7 +37,14 @@ bool MqttSender::connect(const PrjCfgData &cfg)
   if (strlen(cfg.mqtt_server) == 0)
     return false;
 
-  mqttClient.setServer(cfg.mqtt_server, atoi(cfg.mqtt_port));
+  long port = 0;
+  if (!CfgValidate::parseLong(cfg.mqtt_port, 1, 65535, port))
+  {
+    ESP_LOGE(TAG, "Invalid MQTT port '%s' (expected 1..65535), connect aborted", cfg.mqtt_port);
+    return false;
+  }
+
+  mqttClient.setServer(cfg.mqtt_server, static_cast<uint16_t>(port));
   mqttClient.setCallback(mqtt_callback);
 
   String clientId = String("meteo_pub_") + String((uint32_t)esp_random(), HEX);

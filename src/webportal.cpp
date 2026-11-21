@@ -6,6 +6,7 @@
  */
 
 #include "webportal.h"
+#include "cfg_validate.h"
 #include "common.h"
 #include "nvscfg.h"
 #include <WiFiUdp.h>
@@ -353,6 +354,15 @@ void WebConfig::process_autoconnect_or_config(bool f_on_demand)
   snprintf(cfg.latitude, sizeof(cfg.latitude), "%s", custom_lat.getValue());
   snprintf(cfg.longitude, sizeof(cfg.longitude), "%s", custom_long.getValue());
   snprintf(cfg.gmt_offset_sec, sizeof(cfg.gmt_offset_sec), "%s", custom_gmt_offset.getValue());
+
+  // Проверка введённых значений: невалидный конфиг не сохраняем,
+  // иначе станция будет молча работать с неверными координатами/портом/смещением GMT
+  const CfgValidate::Error verr = CfgValidate::check(cfg);
+  if (verr)
+  {
+    ESP_LOGE(TAG, "Config not saved, field '%s': %s", verr.field, verr.msg);
+    shouldSaveConfig = false;
+  }
 
   // Сохранить пользовательские параметры в FS
   if (shouldSaveConfig)

@@ -1,5 +1,6 @@
 #include "netprocessor.h"
 #include "certs.h"
+#include "cfg_validate.h"
 #include "http_helpers.h"
 #include <WiFi.h>
 #include <esp_log.h>
@@ -88,9 +89,14 @@ bool NetProcessor::configureNTPFromConfig()
   const char *ntp_server_alt = "time.google.com"; // альтернативный NTP-сервер
   const char *ntp_server_final = "ntp1.ru";       // финальный NTP-сервер
   long gmt_offset = 3 * 60 * 60;                  // default смещение GMT в секундах (3 часа)
-  if (configOk && strlen(cfg.gmt_offset_sec) > 0)
+  long configured_offset = 0;
+  if (configOk && CfgValidate::parseLong(cfg.gmt_offset_sec, -43200, 50400, configured_offset))
   {
-    gmt_offset = strtol(cfg.gmt_offset_sec, NULL, 10);
+    gmt_offset = configured_offset;
+  }
+  else if (configOk && cfg.gmt_offset_sec[0] != '\0')
+  {
+    ESP_LOGW("NETWORKING", "Invalid gmt_offset_sec '%s', using default %ld", cfg.gmt_offset_sec, gmt_offset);
   }
 
   configTime(gmt_offset, 0, ntp_server, ntp_server_alt, ntp_server_final);
@@ -107,8 +113,16 @@ void NetProcessor::NearestCityProcessing()
     return;
   }
 
-  double lat = atof(cfg.latitude);
-  double lon = atof(cfg.longitude);
+  double lat = 0.0;
+  double lon = 0.0;
+  if (!CfgValidate::parseDouble(cfg.latitude, -90.0, 90.0, lat) ||
+      !CfgValidate::parseDouble(cfg.longitude, -180.0, 180.0, lon))
+  {
+    ESP_LOGW("NETWORKING", "Invalid coordinates (lat='%s', lon='%s'), city name request skipped",
+             cfg.latitude, cfg.longitude);
+    return;
+  }
+
   String city = openMeteo.getNearestCityName(lat, lon);
   // Send to TFT queue (String* allocated on heap)
   String *payload = new String(city);

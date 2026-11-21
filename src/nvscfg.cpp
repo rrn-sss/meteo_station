@@ -7,6 +7,7 @@
  */
 
 #include "nvscfg.h"
+#include "cfg_validate.h"
 #include "tasks_common.h"
 #include <ArduinoJson.h>
 #include <FS.h>
@@ -68,6 +69,13 @@ bool NvsCfg::load(PrjCfgData &cfg)
   readStr(kKeyLongitude, cfg.longitude, sizeof(cfg.longitude));
   readStr(kKeyGmtOffset, cfg.gmt_offset_sec, sizeof(cfg.gmt_offset_sec));
 
+  // Невалидные значения не должны попадать в работу: подменяем дефолтами
+  const int fixed = CfgValidate::applyDefaults(cfg);
+  if (fixed > 0)
+  {
+    ESP_LOGW(TAG, "%d invalid config field(s) replaced by defaults", fixed);
+  }
+
   prefs.end();
   ESP_LOGI(TAG, "Config loaded from NVS OK");
   return true;
@@ -76,6 +84,14 @@ bool NvsCfg::load(PrjCfgData &cfg)
 // ---------------------------------------------------------------------------
 bool NvsCfg::save(const PrjCfgData &cfg)
 {
+  // Не сохраняем заведомо нерабочую конфигурацию
+  const CfgValidate::Error err = CfgValidate::check(cfg);
+  if (err)
+  {
+    ESP_LOGE(TAG, "Config rejected, field '%s': %s", err.field, err.msg);
+    return false;
+  }
+
   Preferences prefs;
   if (!prefs.begin(k_namespace, /*readOnly=*/false))
   {
@@ -170,6 +186,9 @@ bool NvsCfg::migrate(bool delete_old_file)
   snprintf(cfg.latitude, sizeof(cfg.latitude), "%s", json["latitude"] | "");
   snprintf(cfg.longitude, sizeof(cfg.longitude), "%s", json["longitude"] | "");
   snprintf(cfg.gmt_offset_sec, sizeof(cfg.gmt_offset_sec), "%s", json["gmt_offset_sec"] | "");
+
+  // Пустые/некорректные поля в старом config.json не должны ломать миграцию
+  CfgValidate::applyDefaults(cfg);
 
   if (!save(cfg))
   {
