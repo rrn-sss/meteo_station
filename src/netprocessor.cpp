@@ -63,11 +63,12 @@ bool NetProcessor::sendNarodMon(const OutSensorData_t &data)
 bool NetProcessor::configureNTPFromConfig()
 {
   PrjCfgData cfg;
-  bool configOk = webConfig.get_config(cfg);
+  const bool configOk = webConfig.get_config(cfg);
   if (!configOk)
   {
-    ESP_LOGW("NETWORKING", "Cannot configure NTP: failed to get config");
-    return false;
+    // Конфиг недоступен (первый старт, неудачная миграция) — синхронизацию времени
+    // всё равно выполняем, используется дефолтное смещение GMT ниже.
+    ESP_LOGW("NETWORKING", "Config not loaded, NTP will use default GMT offset");
   }
 
   // Дождаться подключения к WiFi (максимум 15 секунд)
