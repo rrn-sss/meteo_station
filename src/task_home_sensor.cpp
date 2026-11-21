@@ -2,9 +2,33 @@
 #include "stack_monitor.h"
 #include "tasks_common.h"
 #include <Adafruit_BME280.h>
+#include <cmath>
 #include <esp_log.h>
 
 Adafruit_BME280 bme; // датчик BME280 (температура, давление, влажность, I2C)
+
+namespace
+{
+// Правдоподобные диапазоны измерений BME280: всё, что вне них (а также NaN/Inf
+// при ошибке I2C), считается сбоем чтения и не попадает в усреднение.
+constexpr float kTempMinC = -90.0f;
+constexpr float kTempMaxC = 90.0f;
+constexpr float kPressMinHpa = 300.0f;
+constexpr float kPressMaxHpa = 1100.0f;
+constexpr float kHumMinPct = -1.0f; // допускаем небольшой выход за 0..100
+constexpr float kHumMaxPct = 101.0f;
+
+// Сколько сбоев подряд терпим до переинициализации датчика
+constexpr unsigned kBadSampleLimit = 5;
+
+bool is_valid_sample(float t, float p, float h)
+{
+  return std::isfinite(t) && std::isfinite(p) && std::isfinite(h) &&
+         t >= kTempMinC && t <= kTempMaxC &&
+         p >= kPressMinHpa && p <= kPressMaxHpa &&
+         h >= kHumMinPct && h <= kHumMaxPct;
+}
+} // namespace
 
 void task_home_sensor_exec(void *pvParameters)
 {
@@ -25,6 +49,35 @@ void task_home_sensor_exec(void *pvParameters)
   StackMonitor_t stackMon;
   stack_monitor_init(&stackMon, TAG);
 
+  // Буферы для усреднения последних HOME_SENSOR_AVG_SAMPLES измерений
+  static float temp_buf[HOME_SENSOR_AVG_SAMPLES] = {0.0f};
+  static float press_buf[HOME_SENSOR_AVG_SAMPLES] = {0.0f};
+  static uint8_t hum_buf[HOME_SENSOR_AVG_SAMPLES] = {0};
+  static int buf_pos = 0;
+  static int buf_count = 0;
+  static float sum_temp = 0.0f;
+  static float sum_press = 0.0f;
+  static int sum_hum = 0;
+  // Счётчик подряд идущих сбоев чтения — для переинициализации датчика
+  static unsigned bad_samples = 0;
+
+  // Полный сброс накопленных данных: используется при переинициализации,
+  // чтобы старые (в том числе нечисловые) значения не участвовали в среднем
+  auto reset_averages = []()
+  {
+    for (int i = 0; i < HOME_SENSOR_AVG_SAMPLES; ++i)
+    {
+      temp_buf[i] = 0.0f;
+      press_buf[i] = 0.0f;
+      hum_buf[i] = 0;
+    }
+    buf_pos = 0;
+    buf_count = 0;
+    sum_temp = 0.0f;
+    sum_press = 0.0f;
+    sum_hum = 0;
+  };
+
   vTaskDelay(20000 / portTICK_PERIOD_MS); // небольшая задержка перед началом работы
 
   for (;;)
@@ -38,6 +91,11 @@ void task_home_sensor_exec(void *pvParameters)
       if (bme.begin(0x76) || bme.begin(0x77))
       {
         found = true;
+        bad_samples = 0;
+        reset_averages();
+        // Сбросить просроченное расписание: иначе vTaskDelayUntil() после
+        // длительного отсутствия датчика отработает серию «догоняющих» замеров
+        xLastWakeTime = xTaskGetTickCount();
         ESP_LOGI(TAG, "BME280 initialized");
       }
       else
@@ -47,22 +105,38 @@ void task_home_sensor_exec(void *pvParameters)
       }
     }
 
-    // Буферы для усреднения последних HOME_SENSOR_AVG_SAMPLES измерений
-    static float temp_buf[HOME_SENSOR_AVG_SAMPLES] = {0.0f};
-    static float press_buf[HOME_SENSOR_AVG_SAMPLES] = {0.0f};
-    static uint8_t hum_buf[HOME_SENSOR_AVG_SAMPLES] = {0};
-    static int buf_pos = 0;
-    static int buf_count = 0;
-    static float sum_temp = 0.0f;
-    static float sum_press = 0.0f;
-    static int sum_hum = 0;
-
     // Считывание с BME280 (текущее измерение)
-    float cur_t = bme.readTemperature();                              // C
-    float cur_p = bme.readPressure() / 100.0F;                        // hPa
-    uint8_t cur_h = static_cast<uint8_t>(roundf(bme.readHumidity())); // %
+    const float cur_t = bme.readTemperature();       // C
+    const float cur_p = bme.readPressure() / 100.0F; // hPa
+    const float cur_h_raw = bme.readHumidity();      // %
 
-    // Обновление сумм и буфера (циклический буфер длины 6)
+    // Сбой чтения (NaN/Inf или значение вне диапазона) не должен попадать
+    // в буферы: иначе он навсегда отравит скользящее среднее и уйдёт в MQTT
+    if (!is_valid_sample(cur_t, cur_p, cur_h_raw))
+    {
+      ++bad_samples;
+      ESP_LOGW(TAG, "Invalid BME280 sample #%u (T=%.2f P=%.2f H=%.2f), skipped",
+               bad_samples, cur_t, cur_p, cur_h_raw);
+
+      if (bad_samples >= kBadSampleLimit)
+      {
+        ESP_LOGW(TAG, "BME280 returned %u invalid samples in a row, re-initializing", bad_samples);
+        found = false; // следующая итерация выполнит bme.begin()
+        bad_samples = 0;
+        reset_averages();
+      }
+
+      // Сохраняем минутный такт опроса, чтобы сбой не вызывал серию повторов
+      vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(60000));
+      continue;
+    }
+    bad_samples = 0;
+
+    // Влажность приводим к 0..100 уже после проверки диапазона
+    const float clamped_h = cur_h_raw < 0.0f ? 0.0f : (cur_h_raw > 100.0f ? 100.0f : cur_h_raw);
+    const uint8_t cur_h = static_cast<uint8_t>(lroundf(clamped_h));
+
+    // Обновление сумм и буфера (циклический буфер длины HOME_SENSOR_AVG_SAMPLES)
     if (buf_count < HOME_SENSOR_AVG_SAMPLES)
     {
       temp_buf[buf_pos] = cur_t;
@@ -88,7 +162,7 @@ void task_home_sensor_exec(void *pvParameters)
     }
     buf_pos = (buf_pos + 1) % HOME_SENSOR_AVG_SAMPLES;
 
-    // Вычислить усреднённые значения (за buf_count измерений, до 6)
+    // Вычислить усреднённые значения (за buf_count измерений, до HOME_SENSOR_AVG_SAMPLES)
     float avg_t = sum_temp / (buf_count ? buf_count : 1);
     float avg_p = sum_press / (buf_count ? buf_count : 1);
     uint8_t avg_h = static_cast<uint8_t>(roundf(static_cast<float>(sum_hum) / (buf_count ? buf_count : 1)));
