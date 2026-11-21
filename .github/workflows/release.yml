@@ -25,11 +25,6 @@ jobs:
           pip install --upgrade pip
           pip install platformio
 
-      - name: Build firmware и LittleFS образ
-        run: |
-          pio run -e esp32-s3-wroom-1-N16R8
-          pio run -e esp32-s3-wroom-1-N16R8 -t buildfs
-
       - name: Извлечь версию из тега
         id: version
         run: |
@@ -37,6 +32,14 @@ jobs:
           VERSION="${TAG#v}"                    # убираем ведущую 'v', если она есть
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "TAG=$TAG" >> $GITHUB_OUTPUT     # для отладки, если нужно
+
+      - name: Build firmware и LittleFS образ
+        env:
+          # Версия прошивки берётся из тега и попадает в APP_VERSION (include/version.h)
+          PLATFORMIO_BUILD_FLAGS: -DAPP_VERSION=\"${{ steps.version.outputs.VERSION }}\"
+        run: |
+          pio run -e esp32-s3-wroom-1-N16R8
+          pio run -e esp32-s3-wroom-1-N16R8 -t buildfs
 
       - name: Проверить и подготовить файлы
         run: |

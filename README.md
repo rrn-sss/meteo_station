@@ -130,6 +130,8 @@ JSON payload:
 pio run
 ```
 
+Версия прошивки хранится в `include/version.h` (макрос `APP_VERSION`) и сравнивается с `manifest.json` при OTA. Для релизных сборок CI переопределяет её из git-тега через `PLATFORMIO_BUILD_FLAGS`, поэтому локально `version.h` нужно править только при необходимости.
+
 ### Прошивка
 
 ```bash
