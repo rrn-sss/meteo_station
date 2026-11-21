@@ -96,7 +96,10 @@ void task_home_sensor_exec(void *pvParameters)
     ESP_LOGI(TAG, "BME280 cur T=%.2f C P=%.2f hPa H=%d%% avg(T,P,H) = %.2f C / %.2f hPa / %d%%",
              cur_t, cur_p, cur_h, avg_t, avg_p, avg_h);
 
-    // Формируем payload с усреднёнными значениями и отправляем в очередь
+    // Формируем payload с усреднёнными значениями и отправляем в очередь.
+    // ВАЖНО: после успешного xQueueSend() владение указателем переходит получателю,
+    // поэтому обе копии (TFT и MQTT) создаются ДО первой отправки, а исходный
+    // указатель после передачи в очередь больше не используется.
     HomeSensorData_t *payload = new HomeSensorData_t(); // TODO удалить после приема !!!
     if (!payload)
     {
@@ -108,6 +111,19 @@ void task_home_sensor_exec(void *pvParameters)
     payload->pressure_in = avg_p;
     payload->humidity_in = avg_h;
 
+    // Копия для MQTT создаётся из локальных значений, пока payload ещё нам принадлежит
+    HomeSensorData_t *payload_mqtt = new HomeSensorData_t();
+    if (payload_mqtt)
+    {
+      payload_mqtt->temperature_in = avg_t;
+      payload_mqtt->pressure_in = avg_p;
+      payload_mqtt->humidity_in = avg_h;
+    }
+    else
+    {
+      ESP_LOGW(TAG, "Failed to allocate HomeSensorData_t copy for MQTT queue");
+    }
+
     QueDataItem_t qitem;
     qitem.type = QUE_DATATYPE_IN_SENSOR_DATA;
     qitem.data = payload;
@@ -117,20 +133,15 @@ void task_home_sensor_exec(void *pvParameters)
       ESP_LOGE(TAG, "Failed to send averaged home sensor data to TFT queue");
       delete payload;
     }
-    else
+
+    if (payload_mqtt)
     {
-      // Also send a copy to MQTT publisher queue if present
-      HomeSensorData_t *payload_mqtt = new HomeSensorData_t();
-      if (payload_mqtt)
+      QueDataItem_t qitem_m;
+      qitem_m.type = QUE_DATATYPE_IN_SENSOR_DATA;
+      qitem_m.data = payload_mqtt;
+      if (pdPASS != xQueueSend(xQueue[PROTASK_NETWORKING], &qitem_m, pdMS_TO_TICKS(100)))
       {
-        *payload_mqtt = *payload;
-        QueDataItem_t qitem_m;
-        qitem_m.type = QUE_DATATYPE_IN_SENSOR_DATA;
-        qitem_m.data = payload_mqtt;
-        if (pdPASS != xQueueSend(xQueue[PROTASK_NETWORKING], &qitem_m, pdMS_TO_TICKS(100)))
-        {
-          delete payload_mqtt;
-        }
+        delete payload_mqtt;
       }
     }
 
