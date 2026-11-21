@@ -24,34 +24,43 @@ static bool g_window_active = false;
 
 static void send_out_sensor_to_queues(const OutSensorData_t &data)
 {
+  // Данные доставляются получателям независимо: переполнение очереди TFT не
+  // должно блокировать публикацию в MQTT/NarodMon и наоборот. Копии создаются
+  // заранее, чтобы после xQueueSend() не обращаться к переданному указателю.
   OutSensorData_t *payload = new OutSensorData_t();
-  if (!payload)
-  {
-    ESP_LOGE("NRF24", "Failed to allocate OutSensorData_t for TFT queue");
-    return;
-  }
-  *payload = data;
-  QueDataItem_t qitem;
-  qitem.type = QUE_DATATYPE_OUT_SENSOR_DATA;
-  qitem.data = payload;
-  if (pdPASS != xQueueSend(xQueue[PROTASK_TFT], &qitem, pdMS_TO_TICKS(100)))
-  {
-    ESP_LOGE("NRF24", "Failed to send OutSensorData to TFT queue");
-    delete payload;
-  }
+  OutSensorData_t *payload_mqtt = new OutSensorData_t();
+
+  if (payload)
+    *payload = data;
   else
+    ESP_LOGE("NRF24", "Failed to allocate OutSensorData_t for TFT queue");
+
+  if (payload_mqtt)
+    *payload_mqtt = data;
+  else
+    ESP_LOGE("NRF24", "Failed to allocate OutSensorData_t for networking queue");
+
+  if (payload)
   {
-    OutSensorData_t *payload_mqtt = new OutSensorData_t();
-    if (payload_mqtt)
+    QueDataItem_t qitem;
+    qitem.type = QUE_DATATYPE_OUT_SENSOR_DATA;
+    qitem.data = payload;
+    if (pdPASS != xQueueSend(xQueue[PROTASK_TFT], &qitem, pdMS_TO_TICKS(100)))
     {
-      *payload_mqtt = data;
-      QueDataItem_t qitem_m;
-      qitem_m.type = QUE_DATATYPE_OUT_SENSOR_DATA;
-      qitem_m.data = payload_mqtt;
-      if (pdPASS != xQueueSend(xQueue[PROTASK_NETWORKING], &qitem_m, pdMS_TO_TICKS(100)))
-      {
-        delete payload_mqtt;
-      }
+      ESP_LOGE("NRF24", "Failed to send OutSensorData to TFT queue");
+      delete payload;
+    }
+  }
+
+  if (payload_mqtt)
+  {
+    QueDataItem_t qitem_m;
+    qitem_m.type = QUE_DATATYPE_OUT_SENSOR_DATA;
+    qitem_m.data = payload_mqtt;
+    if (pdPASS != xQueueSend(xQueue[PROTASK_NETWORKING], &qitem_m, pdMS_TO_TICKS(100)))
+    {
+      ESP_LOGE("NRF24", "Failed to send OutSensorData to networking queue");
+      delete payload_mqtt;
     }
   }
 }

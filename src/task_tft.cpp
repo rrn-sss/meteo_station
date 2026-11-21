@@ -74,8 +74,10 @@ void task_tft_exec(void *pvParameters)
   // Placeholder external sensor battery level (0..100). Update from NRF handler when available.
   uint8_t externalBatteryLevel = 100;
 
-  struct tm prev_timeinfo; // предыдущее время для детекции смены даты
-  getLocalTime(&prev_timeinfo);
+  struct tm prev_timeinfo = {}; // предыдущее время для детекции смены даты
+  // Время может быть ещё не синхронизировано: до первого успешного getLocalTime()
+  // структура остаётся обнулённой, а зависящий от даты код не выполняется
+  bool havePrevTime = getLocalTime(&prev_timeinfo);
 
   vTaskDelay(10000 / portTICK_PERIOD_MS); // задержка перед началом работы (для "стабилизации" LittleFS и TFT)
 
@@ -97,8 +99,9 @@ void task_tft_exec(void *pvParameters)
     }
 
     // Получение текущего времени и обновление виджетов часов/ даты на TFT
-    struct tm timeinfo;
-    if (getLocalTime(&timeinfo))
+    struct tm timeinfo = {};
+    const bool haveTime = getLocalTime(&timeinfo);
+    if (haveTime)
     {
       // Обновляем виджет часов только при изменении минут
       uint8_t hh = static_cast<uint8_t>(timeinfo.tm_hour);
@@ -106,11 +109,13 @@ void task_tft_exec(void *pvParameters)
       const uint8_t padding = 6;
       bool ret1{false}, ret2{false};
 
-      if (hh != static_cast<uint8_t>(prev_timeinfo.tm_hour) ||
+      if (!havePrevTime ||
+          hh != static_cast<uint8_t>(prev_timeinfo.tm_hour) ||
           mm != static_cast<uint8_t>(prev_timeinfo.tm_min) || f_first)
         ret1 = meteo_widgets->draw_dig_clock_widget(padding, padding, hh, mm);
 
-      if (timeinfo.tm_mday != prev_timeinfo.tm_mday ||
+      if (!havePrevTime ||
+          timeinfo.tm_mday != prev_timeinfo.tm_mday ||
           timeinfo.tm_mon != prev_timeinfo.tm_mon ||
           timeinfo.tm_year != prev_timeinfo.tm_year || f_first)
       {
@@ -120,6 +125,7 @@ void task_tft_exec(void *pvParameters)
       }
 
       prev_timeinfo = timeinfo; // сохранить текущее время как предыдущее для следующей итерации
+      havePrevTime = true;
       if (ret1 && ret2)
         f_first = false;
     }
@@ -350,16 +356,21 @@ void task_tft_exec(void *pvParameters)
           int x = MeteoWidgets::getWidgetForW() * col;
           int y = MeteoWidgets::getScreenHeight() - MeteoWidgets::getWidgetForH();
 
-          // Определить отображаемую дату
-          char todayBuf[11];
-          snprintf(todayBuf, sizeof(todayBuf), "%02d-%02d-%04d", timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_year + 1900);
+          // Определить отображаемую дату. Сегодняшняя дата вычисляется только
+          // при успешной синхронизации времени, иначе используем дату из API
+          char todayBuf[11] = {0};
+          if (haveTime)
+            snprintf(todayBuf, sizeof(todayBuf), "%02d-%02d-%04d", timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_year + 1900);
+
           char dateDisplay[16];
-          if (d.date[0] && strcmp(d.date, todayBuf) == 0)
+          if (haveTime && d.date[0] && strcmp(d.date, todayBuf) == 0)
             strncpy(dateDisplay, "СЕГОДНЯ", sizeof(dateDisplay) - 1);
           else if (d.date[0])
             strncpy(dateDisplay, d.date, sizeof(dateDisplay) - 1);
-          else
+          else if (haveTime)
             strncpy(dateDisplay, todayBuf, sizeof(dateDisplay) - 1);
+          else
+            strncpy(dateDisplay, "--", sizeof(dateDisplay) - 1);
           dateDisplay[sizeof(dateDisplay) - 1] = '\0';
 
           float kp = (idx == METEO_DATA_FORECAST_TODAY)      ? geomag.kpmax_today

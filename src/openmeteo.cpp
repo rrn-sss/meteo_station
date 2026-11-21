@@ -77,7 +77,10 @@ bool OpenMeteo::process_meteo_data()
     String serverPath = "http://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon + "&current=weather_code,temperature_2m,precipitation,wind_speed_10m,wind_direction_10m,relative_humidity_2m,surface_pressure&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_direction_10m_dominant,weather_code&forecast_days=3&wind_speed_unit=ms&timezone=Europe/Moscow&models=icon_seamless";
     tring weather_str = send_HTTP_GET_request(serverPath.c_str());
 #else
-    String serverPath = "https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon + "&current=weather_code,temperature_2m,precipitation,wind_speed_10m,wind_direction_10m,relative_humidity_2m,surface_pressure&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_direction_10m_dominant,weather_code&forecast_days=3&wind_speed_unit=ms&timezone=Europe/Moscow&models=icon_seamless";
+    // timezone=auto — Open-Meteo сам определяет часовой пояс по координатам,
+    // поэтому границы прогнозных дней ("сегодня/завтра") верны для любой точки,
+    // а не только для Москвы
+    String serverPath = "https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon + "&current=weather_code,temperature_2m,precipitation,wind_speed_10m,wind_direction_10m,relative_humidity_2m,surface_pressure&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_direction_10m_dominant,weather_code&forecast_days=3&wind_speed_unit=ms&timezone=auto&models=icon_seamless";
     String weather_str = "{}";
     weather_str = send_HTTPS_GET_request(serverPath.c_str(), isrg_ca);
 #endif
