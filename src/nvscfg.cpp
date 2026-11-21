@@ -159,16 +159,17 @@ bool NvsCfg::migrate(bool delete_old_file)
 
   // Build config from JSON and save to NVS
   PrjCfgData cfg{};
-  strncpy(cfg.mqtt_server, json["mqtt_server"] | "", sizeof(cfg.mqtt_server) - 1);
-  strncpy(cfg.mqtt_port, json["mqtt_port"] | "", sizeof(cfg.mqtt_port) - 1);
-  strncpy(cfg.mqtt_user, json["mqtt_user"] | "", sizeof(cfg.mqtt_user) - 1);
-  strncpy(cfg.mqtt_pass, json["mqtt_pass"] | "", sizeof(cfg.mqtt_pass) - 1);
-  strncpy(cfg.mqtt_prefix, json["mqtt_prefix"] | "", sizeof(cfg.mqtt_prefix) - 1);
-  //strncpy(cfg.bot_token, json["bot_token"] | "", sizeof(cfg.bot_token) - 1);
-  //strncpy(cfg.bot_chat_id, json["bot_chat_id"] | "", sizeof(cfg.bot_chat_id) - 1);
-  strncpy(cfg.latitude, json["latitude"] | "", sizeof(cfg.latitude) - 1);
-  strncpy(cfg.longitude, json["longitude"] | "", sizeof(cfg.longitude) - 1);
-  strncpy(cfg.gmt_offset_sec, json["gmt_offset_sec"] | "", sizeof(cfg.gmt_offset_sec) - 1);
+  // snprintf гарантирует null-терминацию даже при усечении значения
+  snprintf(cfg.mqtt_server, sizeof(cfg.mqtt_server), "%s", json["mqtt_server"] | "");
+  snprintf(cfg.mqtt_port, sizeof(cfg.mqtt_port), "%s", json["mqtt_port"] | "");
+  snprintf(cfg.mqtt_user, sizeof(cfg.mqtt_user), "%s", json["mqtt_user"] | "");
+  snprintf(cfg.mqtt_pass, sizeof(cfg.mqtt_pass), "%s", json["mqtt_pass"] | "");
+  snprintf(cfg.mqtt_prefix, sizeof(cfg.mqtt_prefix), "%s", json["mqtt_prefix"] | "");
+  //snprintf(cfg.bot_token, sizeof(cfg.bot_token), "%s", json["bot_token"] | "");
+  //snprintf(cfg.bot_chat_id, sizeof(cfg.bot_chat_id), "%s", json["bot_chat_id"] | "");
+  snprintf(cfg.latitude, sizeof(cfg.latitude), "%s", json["latitude"] | "");
+  snprintf(cfg.longitude, sizeof(cfg.longitude), "%s", json["longitude"] | "");
+  snprintf(cfg.gmt_offset_sec, sizeof(cfg.gmt_offset_sec), "%s", json["gmt_offset_sec"] | "");
 
   if (!save(cfg))
   {

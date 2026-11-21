@@ -342,16 +342,17 @@ void WebConfig::process_autoconnect_or_config(bool f_on_demand)
   }
 
   // Прочитать обновлённые параметры из WiFiManager (после портала)
-  strncpy(cfg.mqtt_server, custom_mqtt_server.getValue(), sizeof(cfg.mqtt_server) - 1);
-  strncpy(cfg.mqtt_port, custom_mqtt_port.getValue(), sizeof(cfg.mqtt_port) - 1);
-  strncpy(cfg.mqtt_user, custom_mqtt_user.getValue(), sizeof(cfg.mqtt_user) - 1);
-  strncpy(cfg.mqtt_pass, custom_mqtt_pass.getValue(), sizeof(cfg.mqtt_pass) - 1);
-  strncpy(cfg.mqtt_prefix, custom_mqtt_prefix.getValue(), sizeof(cfg.mqtt_prefix) - 1);
-  //strncpy(cfg.bot_token, custom_bot_token.getValue(), sizeof(cfg.bot_token) - 1);
-  //strncpy(cfg.bot_chat_id, custom_bot_chat_id.getValue(), sizeof(cfg.bot_chat_id) - 1);
-  strncpy(cfg.latitude, custom_lat.getValue(), sizeof(cfg.latitude) - 1);
-  strncpy(cfg.longitude, custom_long.getValue(), sizeof(cfg.longitude) - 1);
-  strncpy(cfg.gmt_offset_sec, custom_gmt_offset.getValue(), sizeof(cfg.gmt_offset_sec) - 1);
+  // snprintf гарантирует null-терминацию даже при усечении значения
+  snprintf(cfg.mqtt_server, sizeof(cfg.mqtt_server), "%s", custom_mqtt_server.getValue());
+  snprintf(cfg.mqtt_port, sizeof(cfg.mqtt_port), "%s", custom_mqtt_port.getValue());
+  snprintf(cfg.mqtt_user, sizeof(cfg.mqtt_user), "%s", custom_mqtt_user.getValue());
+  snprintf(cfg.mqtt_pass, sizeof(cfg.mqtt_pass), "%s", custom_mqtt_pass.getValue());
+  snprintf(cfg.mqtt_prefix, sizeof(cfg.mqtt_prefix), "%s", custom_mqtt_prefix.getValue());
+  //snprintf(cfg.bot_token, sizeof(cfg.bot_token), "%s", custom_bot_token.getValue());
+  //snprintf(cfg.bot_chat_id, sizeof(cfg.bot_chat_id), "%s", custom_bot_chat_id.getValue());
+  snprintf(cfg.latitude, sizeof(cfg.latitude), "%s", custom_lat.getValue());
+  snprintf(cfg.longitude, sizeof(cfg.longitude), "%s", custom_long.getValue());
+  snprintf(cfg.gmt_offset_sec, sizeof(cfg.gmt_offset_sec), "%s", custom_gmt_offset.getValue());
 
   // Сохранить пользовательские параметры в FS
   if (shouldSaveConfig)
