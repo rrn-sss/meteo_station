@@ -6,6 +6,16 @@
 
 static const char *TAG = "HTTP_HELPERS";
 
+namespace
+{
+// Успешным считается только ответ 2xx: тела 4xx/5xx не должны выглядеть
+// как валидные данные (HTML-страница ошибки и т.п.)
+bool is_success_status(int code)
+{
+  return code >= 200 && code <= 299;
+}
+} // namespace
+
 String send_HTTP_GET_request(const char *serverName)
 {
   if (WiFi.status() != WL_CONNECTED)
@@ -17,19 +27,25 @@ String send_HTTP_GET_request(const char *serverName)
   WiFiClient client;
   HTTPClient http;
 
-  http.begin(client, serverName);
+  if (!http.begin(client, serverName))
+  {
+    ESP_LOGE(TAG, "HTTP GET: failed to start request to %s", serverName);
+    return String("{}");
+  }
 
-  int httpResponseCode = http.GET();
+  const int httpResponseCode = http.GET();
 
   String payload = "{}";
 
-  if (httpResponseCode > 0)
+  if (is_success_status(httpResponseCode))
   {
-    ESP_LOGI(TAG, "HTTP Response code: %u", httpResponseCode);
+    ESP_LOGI(TAG, "HTTP Response code: %d", httpResponseCode);
     payload = http.getString();
   }
+  else if (httpResponseCode > 0)
+    ESP_LOGE(TAG, "HTTP error code: %d (expected 2xx), body ignored", httpResponseCode);
   else
-    ESP_LOGI(TAG, "Error code: %u", httpResponseCode);
+    ESP_LOGW(TAG, "HTTP request failed: %d", httpResponseCode);
 
   http.end();
   return payload;
@@ -51,23 +67,29 @@ String send_HTTPS_GET_request(const char *serverName, const char *ca_cert, const
   else
     client.setInsecure();
 
-  http.begin(client, serverName);
+  if (!http.begin(client, serverName))
+  {
+    ESP_LOGE(TAG, "HTTPS GET: failed to start request to %s", serverName);
+    return String("{}");
+  }
 
   if (!user_agent.isEmpty())
     http.addHeader("User-Agent", user_agent);
 
-  int httpResponseCode = http.GET();
+  const int httpResponseCode = http.GET();
 
   String payload = "{}";
 
-  if (httpResponseCode > 0)
+  if (is_success_status(httpResponseCode))
   {
     ESP_LOGI(TAG, "HTTPS request: %s", serverName);
-    ESP_LOGI(TAG, "HTTPS Response code: %u", httpResponseCode);
+    ESP_LOGI(TAG, "HTTPS Response code: %d", httpResponseCode);
     payload = http.getString();
   }
+  else if (httpResponseCode > 0)
+    ESP_LOGE(TAG, "HTTPS error code: %d (expected 2xx), body ignored", httpResponseCode);
   else
-    ESP_LOGI(TAG, "Error code: %u", httpResponseCode);
+    ESP_LOGW(TAG, "HTTPS request failed: %d", httpResponseCode);
 
   http.end();
   return payload;

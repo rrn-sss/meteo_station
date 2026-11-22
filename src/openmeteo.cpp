@@ -4,6 +4,8 @@
 #include "netprocessor.h"
 #include <ArduinoJson.h>
 #include <WiFi.h>
+#include <cmath>
+#include <cstdio>
 #include <esp_log.h>
 #include <type_traits>
 
@@ -205,19 +207,34 @@ bool OpenMeteo::process_meteo_data()
   return (_METEO_DATA_NUM_ == sent_cnt) ? true : false;
 }
 
-GeoMagneticKpMax parseMaxKpForecast(const String &txt)
+/**
+ * Разбирает таблицу NOAA Kp forecast.
+ *
+ * @return true только если таблица найдена и разобрана хотя бы одна корректная
+ *         строка; при ошибке/смене формата result не заполняется нулями
+ *         «как будто Kp = 0».
+ */
+bool parseMaxKpForecast(const String &txt, GeoMagneticKpMax &result)
 {
-  GeoMagneticKpMax result = {0.0, 0.0, 0.0};
+  result = {0.0f, 0.0f, 0.0f};
 
   // Найти начало таблицы
   int pos = txt.indexOf("NOAA Kp index forecast");
   if (pos == -1)
-    return result;
+  {
+    ESP_LOGW(TAG, "NOAA response has no 'NOAA Kp index forecast' table");
+    return false;
+  }
 
   // Перейти к первой строке с данными (пропускаем 2 строки заголовка)
   pos = txt.indexOf('\n', pos);
+  if (pos == -1)
+    return false;
   pos = txt.indexOf('\n', pos + 1);
+  if (pos == -1)
+    return false;
 
+  int parsedRows = 0;
   for (int i = 0; i < 8; i++)
   {
     int lineEnd = txt.indexOf('\n', pos);
@@ -241,21 +258,18 @@ GeoMagneticKpMax parseMaxKpForecast(const String &txt)
     line = line.substring(8);
     line.trim();
 
-    // Парсинг трёх чисел
-    int s1 = line.indexOf(' ');
-    if (s1 == -1)
+    // Строка должна содержать ровно три числа: сегодня/завтра/послезавтра
+    float v1 = 0.0f, v2 = 0.0f, v3 = 0.0f;
+    if (sscanf(line.c_str(), "%f %f %f", &v1, &v2, &v3) != 3)
       continue;
 
-    float v1 = line.substring(0, s1).toFloat();
-    line = line.substring(s1);
-    line.trim();
-
-    int s2 = line.indexOf(' ');
-    if (s2 == -1)
+    // Kp — безразмерный индекс 0..9; NaN/Inf и мусор отбрасываем
+    if (!std::isfinite(v1) || !std::isfinite(v2) || !std::isfinite(v3) ||
+        v1 < 0.0f || v1 > 9.0f || v2 < 0.0f || v2 > 9.0f ||
+        v3 < 0.0f || v3 > 9.0f)
       continue;
 
-    float v2 = line.substring(0, s2).toFloat();
-    float v3 = line.substring(s2).toFloat();
+    parsedRows++;
 
     // Обновление максимумов
     if (v1 > result.kpmax_today)
@@ -266,59 +280,60 @@ GeoMagneticKpMax parseMaxKpForecast(const String &txt)
       result.kpmax_tomorrow2 = v3;
   }
 
-  return result;
+  if (parsedRows == 0)
+  {
+    ESP_LOGW(TAG, "NOAA Kp forecast table contains no valid rows");
+    return false;
+  }
+
+  return true;
 }
 
 bool OpenMeteo::process_geomagnetic_data()
 {
-  bool ret = false;
-  bool http_error = false;
   GeoMagneticKpMax kp;
 
-  if (1) // для экономии стека
+  String serverPath = "https://services.swpc.noaa.gov/text/3-day-geomag-forecast.txt";
+  String geomag_str = send_HTTPS_GET_request(serverPath.c_str(), ca_amazon_root);
+  if (geomag_str.equals("{}") || geomag_str.length() == 0)
   {
-    String serverPath = "https://services.swpc.noaa.gov/text/3-day-geomag-forecast.txt";
-    String geomag_str = send_HTTPS_GET_request(serverPath.c_str(), ca_amazon_root);
-    http_error = geomag_str.equals("{}");
-    ESP_LOGI(TAG, "%s", geomag_str.c_str());
-    kp = parseMaxKpForecast(geomag_str);
-  }
-
-  if (!http_error)
-  {
-    GeoMagneticKpMax *payload = new GeoMagneticKpMax(); // !!! TODO удалить после обработки в получателе
-
-    if (payload)
-    {
-      ESP_LOGI(TAG, "Kp1: %f Kp2: %f Kp3: %f", kp.kpmax_today, kp.kpmax_tomorrow, kp.kpmax_tomorrow2);
-      ESP_LOGI(TAG, "Max free heap block after geomag fetch: %d", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
-
-      payload->kpmax_today = kp.kpmax_today;
-      payload->kpmax_tomorrow = kp.kpmax_tomorrow;
-      payload->kpmax_tomorrow2 = kp.kpmax_tomorrow2;
-
-      QueDataItem_t qitem;
-      qitem.type = QUE_DATATYPE_GEOMAGNETIC;
-      qitem.data = payload;
-
-      if (pdPASS == xQueueSend(this->xQueues[PROTASK_TFT], &qitem, pdMS_TO_TICKS(100)))
-      {
-        ESP_LOGI(TAG, "Geomagnetic data has been sent to queue [task %d]...", PROTASK_TFT);
-        ret = true;
-      }
-      else
-      {
-        ESP_LOGE(TAG, "Failed to add geomagnetic data to queue [task %d]!", PROTASK_TFT);
-        delete payload;
-      }
-    }
-    else
-      ESP_LOGE(TAG, "Failed to allocate GeoMagneticKpMax");
-  }
-  else
     ESP_LOGE(TAG, "HTTP error when getting geomagnetic data");
+    return false;
+  }
 
-  return ret;
+  if (!parseMaxKpForecast(geomag_str, kp))
+  {
+    ESP_LOGE(TAG, "Failed to parse geomagnetic forecast, previous values kept");
+    return false;
+  }
+
+  GeoMagneticKpMax *payload = new GeoMagneticKpMax(); // !!! TODO удалить после обработки в получателе
+  if (!payload)
+  {
+    ESP_LOGE(TAG, "Failed to allocate GeoMagneticKpMax");
+    return false;
+  }
+
+  ESP_LOGI(TAG, "Kp1: %f Kp2: %f Kp3: %f", kp.kpmax_today, kp.kpmax_tomorrow, kp.kpmax_tomorrow2);
+  ESP_LOGI(TAG, "Max free heap block after geomag fetch: %d", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+
+  payload->kpmax_today = kp.kpmax_today;
+  payload->kpmax_tomorrow = kp.kpmax_tomorrow;
+  payload->kpmax_tomorrow2 = kp.kpmax_tomorrow2;
+
+  QueDataItem_t qitem;
+  qitem.type = QUE_DATATYPE_GEOMAGNETIC;
+  qitem.data = payload;
+
+  if (pdPASS != xQueueSend(this->xQueues[PROTASK_TFT], &qitem, pdMS_TO_TICKS(100)))
+  {
+    ESP_LOGE(TAG, "Failed to add geomagnetic data to queue [task %d]!", PROTASK_TFT);
+    delete payload;
+    return false;
+  }
+
+  ESP_LOGI(TAG, "Geomagnetic data has been sent to queue [task %d]...", PROTASK_TFT);
+  return true;
 }
 
 void OpenMeteo::set_config(const String &latitude, const String &longitude)
