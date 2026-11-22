@@ -16,10 +16,14 @@ static const char *TAG = "NETWORKING";
 
 // Interval for sending data to NarodMon (milliseconds)
 #define NARODMON_INTERVAL_MS (5 * 60 * 1000)
+// Если успешной отправки не было дольше этого времени, индикатор считается устаревшим
+#define NARODMON_STALE_MS (2 * NARODMON_INTERVAL_MS)
 // Last received OUT sensor data and timestamp (millis)
 static OutSensorData_t g_lastOutData{};
 static uint32_t g_lastOutDataMillis = 0;
 static TickType_t g_lastNarodmonTick = 0;
+// Время последней успешной отправки в NarodMon (0 — успехов ещё не было)
+static TickType_t g_lastNarodmonSuccessTick = 0;
 
 void task_networking_exec(void *pvParameters)
 {
@@ -96,7 +100,9 @@ void task_networking_exec(void *pvParameters)
     // Проверка подключения к WiFi и установка битов состояния
     if (WiFi.status() != WL_CONNECTED)
     {
-      xEventGroupClearBits(xEventGroup, BIT_WIFI_STATE_UP);
+      // Без WiFi успешной отправки в NarodMon быть не может
+      xEventGroupClearBits(xEventGroup, BIT_WIFI_STATE_UP | BIT_NARODMON_UP);
+      g_lastNarodmonSuccessTick = 0;
       ESP_LOGW("NET", "WiFi is not connected. Attempting reconnect ...");
 
       // Попробовать восстановить соединение (non-blocking)
@@ -106,7 +112,16 @@ void task_networking_exec(void *pvParameters)
       continue; // повторить попытку на следующей итерации
     }
     else
-      xEventGroupSetBits(xEventGroup, BIT_WIFI_STATE_UP | BIT_NARODMON_UP);
+      xEventGroupSetBits(xEventGroup, BIT_WIFI_STATE_UP);
+
+    // Индикатор NarodMon показывает только подтверждённые отправки: если
+    // последняя успешная отправка слишком старая — гасим его
+    if (g_lastNarodmonSuccessTick != 0 &&
+        (xTaskGetTickCount() - g_lastNarodmonSuccessTick) >= pdMS_TO_TICKS(NARODMON_STALE_MS))
+    {
+      xEventGroupClearBits(xEventGroup, BIT_NARODMON_UP);
+      g_lastNarodmonSuccessTick = 0;
+    }
 
     // MQTT: ensure connection and process any queued sensor data forwarded to networking
     if (WiFi.status() == WL_CONNECTED)
@@ -194,9 +209,16 @@ void task_networking_exec(void *pvParameters)
           // Build NarodMon GET request
           // Use NetProcessor helper to send NarodMon GET
           if (!net.sendNarodMon(g_lastOutData))
+          {
             ESP_LOGW("NETWORKING", "NetProcessor::sendNarodMon failed");
+            xEventGroupClearBits(xEventGroup, BIT_NARODMON_UP);
+            g_lastNarodmonSuccessTick = 0;
+          }
           else
+          {
+            g_lastNarodmonSuccessTick = xTaskGetTickCount();
             xEventGroupSetBits(xEventGroup, BIT_NARODMON_UP);
+          }
         }
         else
         {
@@ -208,7 +230,6 @@ void task_networking_exec(void *pvParameters)
       else
       {
         ESP_LOGI("NETWORKING", "No OUT data cached, skipping NarodMon send");
-        // set EventGroup bit to indicate NarodMon not sent?
         xEventGroupClearBits(xEventGroup, BIT_NARODMON_UP);
       }
     }
