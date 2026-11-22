@@ -364,10 +364,11 @@ void WebConfig::process_autoconnect_or_config(bool f_on_demand)
     shouldSaveConfig = false;
   }
 
-  // Сохранить пользовательские параметры в FS
+  // Сохранить пользовательские параметры в NVS
   if (shouldSaveConfig)
   {
-    set_config(cfg);
+    if (!set_config(cfg))
+      ESP_LOGE(TAG, "Config not persisted to NVS; old settings will be used after reboot");
     vTaskDelay(pdMS_TO_TICKS(5000));
     shouldSaveConfig = false;
   }

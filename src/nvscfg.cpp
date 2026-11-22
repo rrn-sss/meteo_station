@@ -29,6 +29,27 @@ static constexpr const char *kKeyLatitude = "latitude";
 static constexpr const char *kKeyLongitude = "longitude";
 static constexpr const char *kKeyGmtOffset = "gmt_offset";
 
+namespace
+{
+// putString() возвращает strlen(value) при успехе и 0 при ошибке, но 0 —
+// и для пустой строки. Поэтому непустое значение сверяем по длине, а результат
+// в любом случае подтверждаем чтением: ключ должен существовать, а прочитанное
+// значение — совпадать с записанным.
+bool put_string_checked(Preferences &prefs, const char *key, const char *value)
+{
+  const size_t expected = strlen(value);
+  const size_t written = prefs.putString(key, value);
+  if (written != expected ||
+      !prefs.isKey(key) ||
+      prefs.getString(key, "") != value)
+  {
+    ESP_LOGE(TAG, "NVS write failed for key '%s'", key);
+    return false;
+  }
+  return true;
+}
+} // namespace
+
 // ---------------------------------------------------------------------------
 bool NvsCfg::load(PrjCfgData &cfg)
 {
@@ -99,18 +120,29 @@ bool NvsCfg::save(const PrjCfgData &cfg)
     return false;
   }
 
-  prefs.putString(kKeyMqttServer, cfg.mqtt_server);
-  prefs.putString(kKeyMqttPort, cfg.mqtt_port);
-  prefs.putString(kKeyMqttUser, cfg.mqtt_user);
-  prefs.putString(kKeyMqttPass, cfg.mqtt_pass);
-  prefs.putString(kKeyMqttPrefix, cfg.mqtt_prefix);
-  //prefs.putString(kKeyBotToken, cfg.bot_token);
-  //prefs.putString(kKeyBotChatId, cfg.bot_chat_id);
-  prefs.putString(kKeyLatitude, cfg.latitude);
-  prefs.putString(kKeyLongitude, cfg.longitude);
-  prefs.putString(kKeyGmtOffset, cfg.gmt_offset_sec);
+  // Пишем все ключи, чтобы в лог попали все проблемные, и агрегируем результат.
+  // NVS коммитит каждый ключ отдельно, поэтому при сбое возможна частичная
+  // запись; save() в этом случае обязан вернуть false.
+  bool ok = true;
+  ok &= put_string_checked(prefs, kKeyMqttServer, cfg.mqtt_server);
+  ok &= put_string_checked(prefs, kKeyMqttPort, cfg.mqtt_port);
+  ok &= put_string_checked(prefs, kKeyMqttUser, cfg.mqtt_user);
+  ok &= put_string_checked(prefs, kKeyMqttPass, cfg.mqtt_pass);
+  ok &= put_string_checked(prefs, kKeyMqttPrefix, cfg.mqtt_prefix);
+  //ok &= put_string_checked(prefs, kKeyBotToken, cfg.bot_token);
+  //ok &= put_string_checked(prefs, kKeyBotChatId, cfg.bot_chat_id);
+  ok &= put_string_checked(prefs, kKeyLatitude, cfg.latitude);
+  ok &= put_string_checked(prefs, kKeyLongitude, cfg.longitude);
+  ok &= put_string_checked(prefs, kKeyGmtOffset, cfg.gmt_offset_sec);
 
   prefs.end();
+
+  if (!ok)
+  {
+    ESP_LOGE(TAG, "Config NOT saved to NVS; previous values will be used after reboot");
+    return false;
+  }
+
   ESP_LOGI(TAG, "Config saved to NVS OK");
   return true;
 }

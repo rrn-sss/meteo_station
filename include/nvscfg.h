@@ -39,7 +39,8 @@ public:
    * @brief Save all fields of cfg to NVS.
    * @param cfg  Configuration to persist.
    * @return true  on success.
-   * @return false if NVS could not be opened for writing.
+   * @return false if NVS could not be opened for writing or any field
+   *         failed to persist (the previous values then remain in effect).
    */
   static bool save(const PrjCfgData &cfg);
 
