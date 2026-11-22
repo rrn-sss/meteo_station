@@ -204,6 +204,28 @@ private:
   /** @brief Ссылка на объект LGFX для работы с дисплеем */
   LGFX &tft;
 
+  /**
+   * @brief Кэш иконок статуса соединения.
+   * PNG декодируется один раз, а затем спрайт только копируется на экран —
+   * это убирает две декодирования PNG и два выделения PSRAM каждую секунду.
+   */
+  struct CachedIcon
+  {
+    lgfx::LGFX_Sprite sprite;
+    bool ready = false;
+    CachedIcon(LGFX &lcd) : sprite(&lcd) {}
+  };
+
+  CachedIcon iconWifiGreen;
+  CachedIcon iconWifiRed;
+  CachedIcon iconUpGreenGreen;
+  CachedIcon iconUpGreenRed;
+  CachedIcon iconUpRedGreen;
+  CachedIcon iconUpRedRed;
+
+  /** @brief Загрузить иконку в кэш (при отсутствии — повторить попытку) */
+  bool ensure_icon_loaded(CachedIcon &icon, const char *png_name);
+
   /** @brief Объект для декодирования PNG */
   PNG png;
 
