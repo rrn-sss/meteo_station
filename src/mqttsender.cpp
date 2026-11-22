@@ -10,6 +10,17 @@ static const char *TAG = "MQTTSENDER";
 // Интервал повторного подключения к MQTT при неудаче (мс)
 static const uint32_t MQTT_RECONNECT_INTERVAL_MS = 30000;
 
+namespace
+{
+// Формирует топик "<user>/<prefix>/<suffix>". Возвращает false, если строка
+// не поместилась в буфер: публикация в обрезанный топик хуже, чем её пропуск.
+bool format_mqtt_topic(char *buf, size_t buf_size, const PrjCfgData &cfg, const char *suffix)
+{
+  const int written = snprintf(buf, buf_size, "%s/%s/%s", cfg.mqtt_user, cfg.mqtt_prefix, suffix);
+  return written > 0 && static_cast<size_t>(written) < buf_size;
+}
+} // namespace
+
 // Static callback for incoming MQTT messages
 static void mqtt_callback(char *topic, byte *payload, unsigned int length)
 {
@@ -112,12 +123,16 @@ void MqttSender::processing(const PrjCfgData &cfg, QueDataItem_t &qitem)
     {
       if (mqttConnected)
       {
-        char topic[64];
+        // Буфер рассчитан на максимальные значения полей конфигурации:
+        // "<user>/<prefix>/in" вместе с завершающим нулём.
+        char topic[sizeof(cfg.mqtt_user) + sizeof(cfg.mqtt_prefix) + sizeof("/in")];
         char payload[128];
-        snprintf(topic, sizeof(topic), "%s/%s/in", cfg.mqtt_user, cfg.mqtt_prefix);
         snprintf(payload, sizeof(payload), "{\"t\":%.1f,\"p\":%.0f,\"h\":%u}",
                  p->temperature_in, p->pressure_in, p->humidity_in);
-        if (!publish(topic, payload))
+        if (!format_mqtt_topic(topic, sizeof(topic), cfg, "in"))
+          ESP_LOGE(TAG, "MQTT IN topic too long (user='%s', prefix='%s'), publish skipped",
+                   cfg.mqtt_user, cfg.mqtt_prefix);
+        else if (!publish(topic, payload))
           ESP_LOGW(TAG, "Failed publish to %s", topic);
         else
           ESP_LOGI(TAG, "Published IN -> %s", topic);
@@ -134,12 +149,16 @@ void MqttSender::processing(const PrjCfgData &cfg, QueDataItem_t &qitem)
     {
       if (mqttConnected)
       {
-        char topic[64];
+        // Буфер рассчитан на максимальные значения полей конфигурации:
+        // "<user>/<prefix>/out" вместе с завершающим нулём.
+        char topic[sizeof(cfg.mqtt_user) + sizeof(cfg.mqtt_prefix) + sizeof("/out")];
         char payload[128];
-        snprintf(topic, sizeof(topic), "%s/%s/out", cfg.mqtt_user, cfg.mqtt_prefix);
         snprintf(payload, sizeof(payload), "{\"t\":%.1f,\"p\":%u,\"h\":%.0f,\"bat\":%u}",
                  p->temperature, p->pressure, p->humidity, p->bat_charge);
-        if (!publish(topic, payload))
+        if (!format_mqtt_topic(topic, sizeof(topic), cfg, "out"))
+          ESP_LOGE(TAG, "MQTT OUT topic too long (user='%s', prefix='%s'), publish skipped",
+                   cfg.mqtt_user, cfg.mqtt_prefix);
+        else if (!publish(topic, payload))
           ESP_LOGW(TAG, "Failed publish to %s", topic);
         else
           ESP_LOGI(TAG, "Published OUT -> %s", topic);
