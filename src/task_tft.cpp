@@ -97,6 +97,12 @@ void task_tft_exec(void *pvParameters)
       vTaskDelayUntil(&xLastWakeTime, 1000 / portTICK_PERIOD_MS);
       continue; // skip normal updates while OTA is running
     }
+    else if (f_ota_widget_is_drawn)
+    {
+      // OTA завершён (успех → перезагрузка, ошибка → бит снимается в task_ota.cpp).
+      // Сбрасываем флаг, чтобы следующая попытка снова показала экран обновления.
+      f_ota_widget_is_drawn = false;
+    }
 
     // Получение текущего времени и обновление виджетов часов/ даты на TFT
     struct tm timeinfo = {};
