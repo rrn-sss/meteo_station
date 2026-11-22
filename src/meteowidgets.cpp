@@ -564,6 +564,14 @@ bool MeteoWidgets::draw_geomagnetic_widget(uint8_t kr, lgfx::LGFX_Sprite &nested
   }
   else
   {
+    // В наборе иконок есть только kr1..kr8, а NOAA возвращает Kp 0..9.
+    // Ограничиваем индекс, чтобы не запрашивать несуществующий файл
+    // (ошибка в логе и пустой виджет).
+    if (kr < 1)
+      kr = 1;
+    else if (kr > 8)
+      kr = 8;
+
     String strname = "/icons/" + String(GEOMAGNETIC_SPRITE_WH) + "/" + "kr" + String(kr) + "_" + String(GEOMAGNETIC_SPRITE_WH) + ".png";
     if (draw_png_2_sprite(strname, sprite_24))
       sprite_24.pushSprite(&bg_sprite, 0, 0, TFT_TRANSPARENT);
