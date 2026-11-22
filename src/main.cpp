@@ -152,8 +152,7 @@ void setup(void)
     ESP.restart();
   }
 
-  // создание задачи приёма данных с nRF24 (IRQ-driven)
-  // создание задачи приёма данных с nRF24 (IRQ-driven) — статически
+  // создание задачи приёма данных с nRF24 (polling, без IRQ/ISR) — статически
   xHandles[PROTASK_NRF_RECEIVER] = xTaskCreateStatic(
       task_nrf24_exec,
       "NRF24",
