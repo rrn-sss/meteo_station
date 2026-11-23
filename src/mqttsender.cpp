@@ -112,6 +112,11 @@ void MqttSender::processing(const PrjCfgData &cfg, QueDataItem_t &qitem)
 {
   // Payload ownership is transferred to this method: it must be freed even if
   // MQTT is disconnected, otherwise queued sensor data leaks.
+  //
+  // Осознанное решение: при разрыве MQTT-соединения показания за период
+  // недоступности НЕ буферизуются и не ретраятся — payload освобождается
+  // сразу. Приоритет отдаётся свежим данным (следующее сообщение придёт через
+  // секунды/минуты), восстановление устаревших не предусмотрено.
   const bool mqttConnected = mqttClient.connected();
 
   switch (qitem.type)

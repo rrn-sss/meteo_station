@@ -100,6 +100,10 @@ void task_networking_exec(void *pvParameters)
     // Проверка подключения к WiFi и установка битов состояния
     if (WiFi.status() != WL_CONNECTED)
     {
+      // Осознанное решение: пока WiFi недоступен, очередь networking не
+      // вычитывается — производители (HOME_SENSOR, NRF24) ждут xQueueSend
+      // 100 мс и отбрасывают данные. Накопления/буферизации на время
+      // недоступности сети нет: показания за этот период теряются.
       // Без WiFi успешной отправки в NarodMon быть не может
       xEventGroupClearBits(xEventGroup, BIT_WIFI_STATE_UP | BIT_NARODMON_UP);
       g_lastNarodmonSuccessTick = 0;

@@ -69,6 +69,9 @@ void task_tft_exec(void *pvParameters)
   TickType_t lastOutSensorTick = 0;
   bool f_first = true;
   bool f_ota_widget_is_drawn = false;
+  // Устанавливается при снятии BIT_OTA_UPDATE_BIT: экран обновления залил
+  // дисплей целиком, поэтому нужно полностью восстановить все виджеты
+  bool forceFullRedraw = false;
   // Хранение наименования населённого пункта; пока пустая строка
   String cityName = String("");
   // Placeholder external sensor battery level (0..100). Update from NRF handler when available.
@@ -100,8 +103,13 @@ void task_tft_exec(void *pvParameters)
     else if (f_ota_widget_is_drawn)
     {
       // OTA завершён (успех → перезагрузка, ошибка → бит снимается в task_ota.cpp).
-      // Сбрасываем флаг, чтобы следующая попытка снова показала экран обновления.
+      // Сбрасываем флаг, чтобы следующая попытка снова показала экран обновления,
+      // и запускаем полное восстановление экрана: OTA-виджет выполнял fillScreen,
+      // поэтому без forceFullRedraw дата/город/батарея/датчики/прогноз остаются
+      // пустыми до ближайшего сетевого события (до 10 минут).
       f_ota_widget_is_drawn = false;
+      forceFullRedraw = true;
+      f_first = true; // форсирует перерисовку часов и даты в этой же итерации
     }
 
     // Получение текущего времени и обновление виджетов часов/ даты на TFT
@@ -236,7 +244,7 @@ void task_tft_exec(void *pvParameters)
           meteo_widgets->draw_home_in_data_widget(x, y,
                                                   inSensorData.temperature_in, inSensorData.humidity_in,
                                                   inSensorValid);
-          meteo_widgets->draw_city_name_widget(200, 60, cityName);
+          meteo_widgets->draw_city_name_widget(MeteoWidgets::CITY_NAME_X, MeteoWidgets::CITY_NAME_Y, cityName);
 
           delete pdata;
         }
@@ -268,7 +276,7 @@ void task_tft_exec(void *pvParameters)
                                                   inSensorValid);
           // Обновить индикатор заряда батареи внешнего датчика
           meteo_widgets->draw_battery_level_widget(static_cast<uint8_t>(outSensorData.bat_charge));
-          meteo_widgets->draw_city_name_widget(200, 60, cityName);
+          meteo_widgets->draw_city_name_widget(MeteoWidgets::CITY_NAME_X, MeteoWidgets::CITY_NAME_Y, cityName);
 
           delete pdata;
         }
@@ -326,30 +334,35 @@ void task_tft_exec(void *pvParameters)
         meteo_widgets->draw_home_in_data_widget(x, y,
                                                 inSensorData.temperature_in, inSensorData.humidity_in,
                                                 inSensorValid);
-        meteo_widgets->draw_city_name_widget(200, 60, cityName);
+        meteo_widgets->draw_city_name_widget(MeteoWidgets::CITY_NAME_X, MeteoWidgets::CITY_NAME_Y, cityName);
       }
     }
 
     // Определить, нужно ли перерисовать виджеты:
     // 1) Получены новые данные (meteoDataReceived) → отрисовать с valid=true
     // 2) Данные стали невалидными (переход prevMeteoValid → !meteoValid) → отрисовать с valid=false
-    bool needRedraw = meteoDataReceived || (prevMeteoValid && !meteoValid);
+    // 3) Восстановление экрана после OTA-виджета (forceFullRedraw) → по фактической валидности
+    bool needRedraw = meteoDataReceived || (prevMeteoValid && !meteoValid) || forceFullRedraw;
 
     if (needRedraw)
     {
-      bool validFlag = meteoDataReceived ? true : false; // если получены данные — valid=true, иначе false (stale)
+      // Свежие данные → valid=true; при устаревании → false; при восстановлении
+      // после OTA → по фактическому состоянию meteoValid (старые данные не должны
+      // выглядеть свежими, свежие — не должны гаснуть)
+      bool validFlag = meteoDataReceived ? true : (forceFullRedraw ? meteoValid : false);
 
       // Current weather widget
       if (haveMeteo[METEO_DATA_CURRENT])
       {
         OpenMeteoData &d = latestMeteo[METEO_DATA_CURRENT];
-        meteo_widgets->draw_meteo_current_widget(MeteoWidgets::getScreenWidth() - MeteoWidgets::getWidgetCurW(), 60,
+        meteo_widgets->draw_meteo_current_widget(MeteoWidgets::getScreenWidth() - MeteoWidgets::getWidgetCurW(),
+                                                 MeteoWidgets::METEO_CURRENT_Y,
                                                  d.temperature,
                                                  static_cast<uint8_t>(d.relative_humidity),
                                                  d.wind_speed,
                                                  static_cast<uint16_t>(d.wind_direction),
                                                  static_cast<uint8_t>(d.weather_code), validFlag);
-        meteo_widgets->draw_city_name_widget(200, 60, cityName);
+        meteo_widgets->draw_city_name_widget(MeteoWidgets::CITY_NAME_X, MeteoWidgets::CITY_NAME_Y, cityName);
       }
 
       // Forecast widgets (indices 1..3)
@@ -400,6 +413,38 @@ void task_tft_exec(void *pvParameters)
                                                     String(dateDisplay), kp, validFlag);
         }
       }
+    }
+
+    // Восстановление полного состояния экрана после OTA-виджета.
+    // Порядок важен: блок выполняется ПОСЛЕ отрисовки метео-виджетов,
+    // чтобы городская надпись (намеренно перекрывающая иконку погоды,
+    // см. MeteoWidgets::CITY_NAME_*) осталась поверх неё.
+    if (forceFullRedraw)
+    {
+      ESP_LOGI("TFT", "Restoring full screen state after OTA widget");
+
+      // Домашние датчики (та же геометрия, что и при обработке очереди)
+      const uint8_t padding = 6;
+      const int x = 0;
+      const int y = MeteoWidgets::getClockDigsH() + padding;
+      meteo_widgets->draw_home_out_data_widget(x, y,
+                                               outSensorData.temperature, static_cast<uint8_t>(outSensorData.humidity),
+                                               outSensorValid);
+      meteo_widgets->draw_home_in_data_widget(x, y,
+                                              inSensorData.temperature_in, inSensorData.humidity_in,
+                                              inSensorValid);
+
+      // Иконка батареи: fillScreen удалил её с экрана — сбрасываем кэш
+      // и перерисовываем, если данные наружного датчика есть
+      meteo_widgets->reset_battery_cache();
+      if (outSensorValid)
+        meteo_widgets->draw_battery_level_widget(static_cast<uint8_t>(outSensorData.bat_charge));
+
+      // Городской надзаголовок (пустое имя не рисуем — лишний прямоугольник)
+      if (cityName.length() > 0)
+        meteo_widgets->draw_city_name_widget(MeteoWidgets::CITY_NAME_X, MeteoWidgets::CITY_NAME_Y, cityName);
+
+      forceFullRedraw = false;
     }
 
     // Обновить предыдущее состояние valid

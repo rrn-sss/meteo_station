@@ -5,6 +5,7 @@
 #include <Arduino.h>
 #include <RF24.h>
 #include <SPI.h>
+#include <cmath>
 #include <esp_log.h>
 
 RF24 radio(NRF_CE_PIN, NRF_CSN_PIN); // радиоприемник nRF24L01+
@@ -21,6 +22,30 @@ static OutSensorData_t g_window_min_data{};
 static uint32_t g_window_start_ms = 0;
 static bool g_first_data_sent = false;
 static bool g_window_active = false;
+
+namespace
+{
+// Правдоподобные диапазоны для пакета наружного датчика (SHTC3 + барометр,
+// заряд батареи в процентах — см. README). По духу это то же правило, что и
+// для BME280 в task_home_sensor.cpp: NaN/Inf и мусор от повреждённого приёма
+// не должны попадать ни в окно агрегации, ни на экран, ни в MQTT/NarodMon.
+constexpr float kOutTempMinC = -90.0f;
+constexpr float kOutTempMaxC = 90.0f;
+constexpr uint16_t kOutPressMinHpa = 300;
+constexpr uint16_t kOutPressMaxHpa = 1100;
+constexpr float kOutHumMinPct = -1.0f; // допускаем небольшой выход за 0..100
+constexpr float kOutHumMaxPct = 101.0f;
+constexpr uint16_t kOutBatMaxPct = 100;
+
+bool is_valid_out_sample(const OutSensorData_t &d)
+{
+  return std::isfinite(d.temperature) && std::isfinite(d.humidity) &&
+         d.temperature >= kOutTempMinC && d.temperature <= kOutTempMaxC &&
+         d.humidity >= kOutHumMinPct && d.humidity <= kOutHumMaxPct &&
+         d.pressure >= kOutPressMinHpa && d.pressure <= kOutPressMaxHpa &&
+         d.bat_charge <= kOutBatMaxPct;
+}
+} // namespace
 
 static void send_out_sensor_to_queues(const OutSensorData_t &data)
 {
@@ -121,6 +146,16 @@ void task_nrf24_exec(void *pvParameters)
         OutSensorData_t data{};
         size_t len = sizeof(data);
         radio.read(&data, len);
+
+        // Мусорный пакет (повреждённый приём) отбрасывается целиком: он не
+        // участвует в статистике, в окне агрегации и не уходит в очереди
+        if (!is_valid_out_sample(data))
+        {
+          ESP_LOGW("NRF24", "Invalid OutSensorData packet ignored: T=%.2f H=%.2f P=%u BAT=%u",
+                   data.temperature, data.humidity, data.pressure, data.bat_charge);
+          continue;
+        }
+
         // Время приёма и статистика интервалов
         uint32_t now_ms = millis();
         uint32_t delta_ms = 0;

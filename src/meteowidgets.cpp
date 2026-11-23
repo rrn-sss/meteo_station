@@ -1264,9 +1264,10 @@ bool MeteoWidgets::draw_connection_state_widget(bool up, bool down, bool wifi)
 
 bool MeteoWidgets::draw_city_name_widget(uint16_t pos_x, uint16_t pos_y, const String &cityName)
 {
-  // Widget size: use existing constants for consistency
-  const uint16_t w = 160;
-  const uint16_t h = 25;
+  // Размеры и координаты заданы константами CITY_NAME_* (см. meteowidgets.h):
+  // прямоугольник намеренно перекрывает верхнюю (пустую) часть иконки погоды.
+  const uint16_t w = CITY_NAME_W;
+  const uint16_t h = CITY_NAME_H;
 
   // Use a background sprite and an inner sprite for text, then push with transparency
   lgfx::LGFX_Sprite widget_bg_cur_sprite(&tft);
@@ -1371,10 +1372,20 @@ bool MeteoWidgets::draw_battery_level_widget(uint8_t level)
   return ok;
 }
 
+void MeteoWidgets::reset_battery_cache()
+{
+  lastBatteryLevel = 255; // 255 = «не установлено» — следующая отрисовка всегда выполнится
+}
+
 bool MeteoWidgets::draw_update_processing_widget()
 {
   // Fill entire screen with background color first
   tft.fillScreen(WIDGET_BG_COLOR);
+
+  // Экран залит целиком — иконка батареи физически удалена с дисплея,
+  // сбрасываем кэш, иначе она не восстановится до смены уровня заряда
+  // (см. reset_battery_cache)
+  reset_battery_cache();
 
   // Draw a rounded red framed rectangle centered on screen
   const uint16_t margin = 20;
