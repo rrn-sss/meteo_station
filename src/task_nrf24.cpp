@@ -39,11 +39,16 @@ constexpr uint16_t kOutBatMaxPct = 100;
 
 bool is_valid_out_sample(const OutSensorData_t &d)
 {
+  // У внешнего датчика на SHTC3/SHT31 барометра нет, и он передаёт pressure = 0.
+  // Ноль означает «давление не измеряется» и допустим; остальные значения
+  // должны попадать в правдоподобный диапазон.
+  const bool pressureOk = (d.pressure == 0) ||
+                          (d.pressure >= kOutPressMinHpa && d.pressure <= kOutPressMaxHpa);
+
   return std::isfinite(d.temperature) && std::isfinite(d.humidity) &&
          d.temperature >= kOutTempMinC && d.temperature <= kOutTempMaxC &&
          d.humidity >= kOutHumMinPct && d.humidity <= kOutHumMaxPct &&
-         d.pressure >= kOutPressMinHpa && d.pressure <= kOutPressMaxHpa &&
-         d.bat_charge <= kOutBatMaxPct;
+         pressureOk && d.bat_charge <= kOutBatMaxPct;
 }
 } // namespace
 
